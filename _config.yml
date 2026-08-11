@@ -1,0 +1,16 @@
+title: "Notes from the Bottle"   # pick your own blog title
+description: "Occasional notes on ML, physics, and things in between"
+author: ""                        # your name
+theme: minima
+# If you publish as a *project* page (github.com/<user>/blog), set:
+#   baseurl: "/blog"
+# If you publish as <user>.github.io, leave baseurl empty.
+baseurl: ""
+url: ""
+
+markdown: kramdown
+kramdown:
+  math_engine: mathjax
+
+plugins:
+  - jekyll-feed
