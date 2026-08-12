@@ -25,5 +25,6 @@ plugins:
 exclude:
   - README.md
   - linkedin-teaser.md
+  - preview.sh
   - Gemfile
   - Gemfile.lock
