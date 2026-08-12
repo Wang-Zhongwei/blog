@@ -26,6 +26,29 @@
       pageReady: function () {
         return MathJax.startup.defaultPageReady().then(function () {
           document.documentElement.classList.add('mathjax-ready');
+
+          // MathJax and late-loading images change the page height after the
+          // browser's initial hash navigation. Re-align only after both settle.
+          if (window.location.hash) {
+            var alignHashTarget = function () {
+              requestAnimationFrame(function () {
+                var id;
+                try {
+                  id = decodeURIComponent(window.location.hash.slice(1));
+                } catch (e) {
+                  id = window.location.hash.slice(1);
+                }
+                var target = document.getElementById(id);
+                if (target) target.scrollIntoView();
+              });
+            };
+
+            if (document.readyState === 'complete') {
+              alignHashTarget();
+            } else {
+              window.addEventListener('load', alignHashTarget, { once: true });
+            }
+          }
         });
       }
     }
