@@ -5,7 +5,7 @@ theme: minima
 # If you publish as a *project* page (github.com/<user>/blog), set:
 #   baseurl: "/blog"
 # If you publish as <user>.github.io, leave baseurl empty.
-baseurl: ""
+baseurl: "/blog"
 url: ""
 
 markdown: kramdown
