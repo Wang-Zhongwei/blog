@@ -11,6 +11,7 @@ layout: default
     {%- if page.subtitle %}
     <p class="post-subtitle">{{ page.subtitle | escape }}</p>
     {%- endif %}
+    <div class="title-rule" aria-hidden="true"></div>
     {%- if page.tags and page.tags.size > 0 %}
     <ul class="tag-list">
       {%- for tag in page.tags %}<li>{{ tag }}</li>{% endfor -%}

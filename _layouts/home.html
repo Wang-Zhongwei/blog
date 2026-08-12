@@ -7,9 +7,12 @@ layout: default
   {%- if site.description and site.description != '' %}
   <p class="intro-tagline">{{ site.description }}</p>
   {%- endif %}
+  <div class="title-rule" aria-hidden="true"></div>
 </section>
 
-{{ content }}
+{%- if content and content != '' %}
+<div class="flow">{{ content }}</div>
+{%- endif %}
 
 <section class="post-list">
   {%- if site.posts.size > 0 -%}
@@ -24,9 +27,10 @@ layout: default
       {%- if post.subtitle %}
       <p class="post-item-subtitle">{{ post.subtitle | escape }}</p>
       {%- endif %}
-      <p class="post-item-excerpt">
-        {{ post.excerpt | strip_html | normalize_whitespace | truncate: 220 }}
-      </p>
+      {%- assign clean = post.excerpt | strip_html | normalize_whitespace | strip -%}
+      {%- if clean != '' %}
+      <p class="post-item-excerpt">{{ clean | truncate: 220 }}</p>
+      {%- endif %}
       <a class="read-more" href="{{ post.url | relative_url }}">Read<span aria-hidden="true"> &rarr;</span></a>
     </article>
     {%- endfor -%}

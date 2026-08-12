@@ -1,11 +1,41 @@
-<!-- MathJax v3: renders $$...$$ display math and \(...\) inline math -->
+<!-- MathJax v3 ---------------------------------------------------------------
+     kramdown's mathjax engine emits display math as \[ ... \] and leaves
+     single-dollar inline math as literal text, so both delimiter styles are
+     registered below. Loaded async per MathJax v3 guidance; the config object
+     must be assigned before the library script runs.
+-->
 <script>
-  MathJax = {
+  window.MathJax = {
     tex: {
-      inlineMath: [['\\(', '\\)'], ['$', '$']],
+      inlineMath: [['$', '$'], ['\\(', '\\)']],
       displayMath: [['$$', '$$'], ['\\[', '\\]']],
-      processEscapes: true
+      processEscapes: true,
+      processEnvironments: true,
+      tags: 'ams'
+    },
+    options: {
+      skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'],
+      ignoreHtmlClass: 'no-mathjax'
+    },
+    chtml: {
+      scale: 1.02,
+      displayAlign: 'center'
+    },
+    startup: {
+      // Reveal math only once it is typeset, so readers never see raw TeX.
+      pageReady: function () {
+        return MathJax.startup.defaultPageReady().then(function () {
+          document.documentElement.classList.add('mathjax-ready');
+        });
+      }
     }
   };
 </script>
-<script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+<!-- Fail-safe: if the CDN is blocked or slow, stop hiding math after 3s. -->
+<script>
+  setTimeout(function () {
+    document.documentElement.classList.add('mathjax-ready');
+  }, 3000);
+</script>
