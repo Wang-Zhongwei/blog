@@ -35,9 +35,9 @@
   --font-body: "Source Serif 4", "Source Serif Pro", Charter, Georgia, Cambria, serif;
   --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
-  /* Layout */
-  --measure: 40rem;   /* ~66ch of body text */
-  --wide: 54rem;      /* plots, tables, code break out to here */
+  /* Layout — one column width for everything: prose, plots, tables, code,
+     header and footer all align to the same measure. */
+  --measure: 42rem;   /* ~68ch of body text */
   --gutter: 1.5rem;
 }
 
@@ -106,7 +106,7 @@ body {
 
 .shell {
   width: 100%;
-  max-width: var(--wide);
+  max-width: var(--measure);
   margin-inline: auto;
   padding-inline: var(--gutter);
 }
@@ -233,35 +233,21 @@ a:hover { color: var(--hot-bright); }
 :root:not([data-theme="dark"]) .icon-sun { display: none; }
 
 /* ==========================================================================
-   Content grid — prose holds a comfortable measure; figures, tables and code
-   break out to the wider track.
+   Content column — everything shares the one measure, so figures and tables
+   line up flush with the prose rather than breaking out past it.
    ========================================================================== */
 
 .flow,
 .post-content {
-  display: grid;
-  grid-template-columns:
-    [wide-start] minmax(var(--gutter), 1fr)
-    [text-start] min(var(--measure), calc(100% - 2 * var(--gutter)))
-    [text-end] minmax(var(--gutter), 1fr)
-    [wide-end];
-  row-gap: 1.35em;
-}
-.flow > *,
-.post-content > * { grid-column: text; margin-block: 0; }
-
-.post-content > figure,
-.post-content > .highlight,
-.post-content > pre,
-.post-content > table,
-.post-content > .table-wrap,
-.post-content > p:has(> img:only-child) {
-  grid-column: wide;
-  width: 100%;
-  max-width: var(--wide);
+  display: flex;
+  flex-direction: column;
+  gap: 1.35em;
+  max-width: var(--measure);
   margin-inline: auto;
   padding-inline: var(--gutter);
 }
+.flow > *,
+.post-content > * { margin-block: 0; min-width: 0; }
 
 /* ==========================================================================
    Home
@@ -402,7 +388,7 @@ a:hover { color: var(--hot-bright); }
   line-height: 1.2;
   letter-spacing: -0.01em;
   text-wrap: balance;
-  margin-top: 1.6em;
+  margin-top: 1em;   /* sits on top of the column gap */
 }
 .post-content h2 { font-size: 1.85rem; }
 .post-content h3 { font-size: 1.35rem; }
