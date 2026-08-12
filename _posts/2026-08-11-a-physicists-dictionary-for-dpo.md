@@ -156,20 +156,20 @@ so the system has two energy levels and the correct responses are the ground sta
 
 ### Offline: reweight a fixed candidate set
 
-Sample 24 candidates for each of 64 test prompts — 1,536 completions at temperature
-0.8, top-p 0.95, 512-token cap — score them under $$\pi_{\mathrm{ref}}$$, and treat
-those 24 as the entire state space. Then $$Z_{\beta}$$, $$\pi_{\beta}^{\ast}$$, and
-$$\mathcal{F}_{\beta}$$ are exact sums over 24 terms, and sweeping $$\beta$$ traces
-the frontier with no estimator in the way.
+For each of 64 GSM8K test prompts $$x_i$$, I sampled 24 candidate responses $$y_{ij}$$
+from the base model — 1,536 completions at temperature 0.8, top-p 0.95, 512-token cap.
+Each candidate carries two numbers: its base-model log-probability, normalized over the
+24 to give $$\pi_{\mathrm{ref}}(y_{ij})$$, and its correctness $$r(y_{ij})\in\{0,1\}$$.
 
-The choice of base measure matters more than I expected. Raw sequence probability is
-brutally concentrated — mean effective sample size 1.12 out of 24 candidates — while
-length normalization spreads the same mass over 10 to 23. Both reach the same
-zero-temperature ceiling of 0.844 expected reward, set by the 54 of 64 prompts holding
-at least one correct candidate. They differ in price: sequence probability pays 9.17
-nats of $$D_{\mathrm{KL}}(\pi_{\beta}^{\ast}\|\pi_{\mathrm{ref}})$$ to get there,
-length normalization 1.17 nats, eight times less. Reward always overcomes reference
-improbability at low enough temperature; the base measure sets what that costs.
+Taking those 24 as the whole state space makes everything a finite sum, so for each
+prompt
+
+$$Z_{\beta}(x_i)=\sum_{j=1}^{24}\pi_{\mathrm{ref}}(y_{ij})e^{r(y_{ij})/\beta},
+\qquad
+\pi_{\beta}^{\ast}(y_{ij})=\frac{\pi_{\mathrm{ref}}(y_{ij})e^{r(y_{ij})/\beta}}{Z_{\beta}(x_i)}$$
+
+are exact — no sampling estimator anywhere. Sweeping $$\beta$$ then traces the whole
+frontier directly.
 
 <figure id="figure-reward-kl-frontier">
   <img src="{{ '/assets/figures/real/01_reward_kl_frontier.png' | relative_url }}" alt="Reward–KL frontier across beta values">
