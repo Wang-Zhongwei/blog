@@ -1,0 +1,36 @@
+---
+layout: default
+---
+
+<section class="intro">
+  <h1 class="intro-title">{{ site.title }}</h1>
+  {%- if site.description and site.description != '' %}
+  <p class="intro-tagline">{{ site.description }}</p>
+  {%- endif %}
+</section>
+
+{{ content }}
+
+<section class="post-list">
+  {%- if site.posts.size > 0 -%}
+    {%- for post in site.posts -%}
+    <article class="post-item">
+      <time class="post-date" datetime="{{ post.date | date_to_xmlschema }}">
+        {{ post.date | date: "%b %-d, %Y" }}
+      </time>
+      <h2 class="post-item-title">
+        <a href="{{ post.url | relative_url }}">{{ post.title | escape }}</a>
+      </h2>
+      {%- if post.subtitle %}
+      <p class="post-item-subtitle">{{ post.subtitle | escape }}</p>
+      {%- endif %}
+      <p class="post-item-excerpt">
+        {{ post.excerpt | strip_html | normalize_whitespace | truncate: 220 }}
+      </p>
+      <a class="read-more" href="{{ post.url | relative_url }}">Read<span aria-hidden="true"> &rarr;</span></a>
+    </article>
+    {%- endfor -%}
+  {%- else -%}
+    <p class="empty">No posts yet.</p>
+  {%- endif -%}
+</section>

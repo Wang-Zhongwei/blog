@@ -1,0 +1,28 @@
+---
+layout: default
+---
+
+<article class="post">
+  <header class="post-header">
+    <time class="post-date" datetime="{{ page.date | date_to_xmlschema }}">
+      {{ page.date | date: "%B %-d, %Y" }}
+    </time>
+    <h1 class="post-title">{{ page.title | escape }}</h1>
+    {%- if page.subtitle %}
+    <p class="post-subtitle">{{ page.subtitle | escape }}</p>
+    {%- endif %}
+    {%- if page.tags and page.tags.size > 0 %}
+    <ul class="tag-list">
+      {%- for tag in page.tags %}<li>{{ tag }}</li>{% endfor -%}
+    </ul>
+    {%- endif %}
+  </header>
+
+  <div class="post-content">
+    {{ content }}
+  </div>
+
+  <footer class="post-footer">
+    <a class="read-more" href="{{ '/' | relative_url }}"><span aria-hidden="true">&larr; </span>All posts</a>
+  </footer>
+</article>

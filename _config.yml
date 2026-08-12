@@ -1,16 +1,29 @@
 title: "Notes from the Bottle"   # pick your own blog title
 description: "Occasional notes on ML, physics, and things in between"
-author: ""                        # your name
-theme: minima
+author: "Zhongwei Wang"
+
+# Layouts, styles and the light/dark toggle live in this repo (_layouts/,
+# assets/css/main.css) — no external theme gem, so nothing to keep in sync
+# with whatever version GitHub Pages happens to ship.
+
 # If you publish as a *project* page (github.com/<user>/blog), set:
 #   baseurl: "/blog"
 # If you publish as <user>.github.io, leave baseurl empty.
 baseurl: "/blog"
-url: ""
+url: "https://wang-zhongwei.github.io"
 
 markdown: kramdown
 kramdown:
   math_engine: mathjax
+  syntax_highlighter: rouge
+
+excerpt_separator: "\n\n"
 
 plugins:
   - jekyll-feed
+
+exclude:
+  - README.md
+  - linkedin-teaser.md
+  - Gemfile
+  - Gemfile.lock
