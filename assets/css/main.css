@@ -37,7 +37,7 @@
 
   /* Layout — one column width for everything: prose, plots, tables, code,
      header and footer all align to the same measure. */
-  --measure: 48rem;
+  --measure: max(60vw, 48rem);
   --gutter: 1.5rem;
 }
 

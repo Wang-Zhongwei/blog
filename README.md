@@ -78,11 +78,11 @@ Front matter:
 ```yaml
 ---
 layout: post
-title: "A Physicist's Dictionary for DPO"
+title: "A Statistical-Physics View of KL-Regularized RL"
 date: 2026-08-11
-tags: [machine-learning, statistical-mechanics]
+tags: [statistical-mechanics, rlhf, dpo]
 subtitle: "Optional — shown under the title"   # optional
-image: /assets/figures/real/01_reward_kl_frontier.png   # optional, link previews
+image: /assets/figures/reward-kl-frontier.png   # optional, link previews
 ---
 ```
 
@@ -92,10 +92,11 @@ delimiter styles with MathJax. Use `$$...$$` for display and `$...$` inline.
 Raw TeX stays visible while MathJax loads, so a blocked CDN degrades to
 readable source instead of a blank column.
 
-**Figures** live in `assets/figures/` and are referenced from the site root:
+**Figures** live flat in `assets/figures/` (one file per figure, no per-post
+subfolders) and are referenced from the site root:
 
 ```markdown
-![Free energy decomposition](/blog/assets/figures/real/02_free_energy_decomposition.png)
+![Free energy landscape](/blog/assets/figures/free-energy-landscape.png)
 *Italic line right after an image is styled as a caption.*
 ```
 
