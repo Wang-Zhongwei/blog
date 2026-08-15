@@ -39,13 +39,14 @@ which is 1 at rho = 1 (matching the unclipped slope of the others) and decays
 smoothly, never reaching zero. There is no boundary and no dead zone -- only
 attenuation -- so that panel is drawn with f' contours instead of a hatched mask.
 
-GSPO is handled apart from the four. Its gate is PPO's, unchanged; what changes
-is the argument, from the token ratio rho_t to the length-normalized sequence
-ratio s_i, and with it the scale -- published clip ranges of 3e-4 / 4e-4 against
-GRPO's 0.2. It therefore gets its own panel on its own axis (render_gspo) plus a
-side-by-side against PPO (render_gspo_scale_contrast), and stays out of METHODS
-so the four-panel strip and the effective-coefficient curves keep a single
-shared ratio axis.
+GSPO is the same f as PPO under the substitution (rho_t, A_t) -> (rho_s, A_s):
+the token ratio becomes the length-normalized sequence ratio, the token
+advantage becomes the sequence advantage, and f is untouched. Its panel is
+therefore the same picture on relabelled axes -- the reason it is drawn
+separately (render_gspo) rather than added to METHODS is purely scale. Published
+clip ranges are 3e-4 / 4e-4 against GRPO's 0.2, so a shared ratio axis would
+either blank GSPO's panel or crush the other four into a hairline;
+render_gspo_scale_contrast makes that ~600x gap the subject of its own figure.
 
 Writes to this experiment's local figures/ directory. Promote to
 assets/figures/<post-slug>/ by hand once a figure is final.
@@ -138,15 +139,17 @@ def dapo_fprime(adv, rho, eps_l=EPS_LOW, eps_h=EPS_HIGH):
     return live.astype(float)
 
 
-def gspo_fprime(adv, s, eps_l=GSPO_EPS_LOW, eps_h=GSPO_EPS_HIGH):
-    """Same sign-dependent clip as PPO/DAPO -- the argument is the only change.
+def gspo_fprime(adv, rho_s, eps_l=GSPO_EPS_LOW, eps_h=GSPO_EPS_HIGH):
+    """dapo_fprime under (rho_t, A_t) -> (rho_s, A_s). The argument is the change.
 
     GSPO's objective (Eq. 5 of arXiv:2507.18071) is PPO's min/clip verbatim with
-    (rho_t, A_t) replaced by (s_i, A_i), so the gate has the identical algebraic
-    form. The paper's left and right ranges differ (3e-4 vs 4e-4), which makes
-    the shape DAPO's rather than PPO's -- asymmetric about s_i = 1.
+    the token pair replaced by the sequence pair, so the gate is algebraically
+    identical -- this body is dapo_fprime's, and is kept separate only to carry
+    GSPO's own epsilons. The paper writes rho_s as s_i and A_s as A-hat_i, and
+    its left and right ranges differ (3e-4 vs 4e-4), so the wedges come out
+    asymmetric about rho_s = 1 the way DAPO's are rather than PPO's.
     """
-    live = ((adv > 0) & (s < 1.0 + eps_h)) | ((adv < 0) & (s > 1.0 - eps_l))
+    live = ((adv > 0) & (rho_s < 1.0 + eps_h)) | ((adv < 0) & (rho_s > 1.0 - eps_l))
     return live.astype(float)
 
 
@@ -266,9 +269,9 @@ GSPO = {
     "fprime": gspo_fprime,
     "log_lim": GSPO_LOG_S_LIM,
     "params": r"$\epsilon_l=3\times10^{-4},\ \epsilon_h=4\times10^{-4}$",
-    "xlabel": r"sequence advantage  $\widehat{A}_i$",
-    "ylabel": r"log sequence ratio  $\log s_i$",
-    "cbar_label": r"gate  $f'(s_i;\, \widehat{A}_i)$",
+    "xlabel": r"sequence advantage  $A_s$",
+    "ylabel": r"log sequence ratio  $\log \rho_s$",
+    "cbar_label": r"gate  $f'(\rho_s;\, A_s)$",
     "sci_y": True,
     "note": (
         "Paper values, not exaggerated. Note the vertical scale: "
@@ -282,12 +285,12 @@ GSPO = {
         (
             A_LIM * 0.55,
             GSPO_LOG_S_LIM * 0.78,
-            "clipped\n$\\widehat{A}_i>0,\\ s_i>1+\\epsilon_h$",
+            "clipped\n$A_s>0,\\ \\rho_s>1+\\epsilon_h$",
         ),
         (
             -A_LIM * 0.55,
             -GSPO_LOG_S_LIM * 0.68,
-            "clipped\n$\\widehat{A}_i<0,\\ s_i<1-\\epsilon_l$",
+            "clipped\n$A_s<0,\\ \\rho_s<1-\\epsilon_l$",
         ),
     ],
     "short_regions": [
@@ -571,8 +574,8 @@ def render_gspo_scale_contrast(out_dir):
 
     adv_s, log_s, s = grids(GSPO_LOG_S_LIM)
     mesh = draw_panel(axes[1], GSPO, adv_s, log_s, s, boundary_labels=False)
-    axes[1].set_ylabel(r"log sequence ratio  $\log s_i$")
-    axes[1].set_xlabel(r"sequence advantage  $\widehat{A}_i$")
+    axes[1].set_ylabel(r"log sequence ratio  $\log \rho_s$")
+    axes[1].set_xlabel(r"sequence advantage  $A_s$")
     axes[1].set_title(
         rf"GSPO — sequence ratio   ({GSPO['params']})",
         color=INK_PRIMARY,

@@ -160,14 +160,15 @@ $$
 f'(\rho_t;A_t).
 $$
 
-Three of the four methods switch on $\mathrm{sign}(A_t)$, so the gate is still a function of both coordinates — hence the semicolon — but it carries no factor of $A_t$ and no factor of $\rho_t$. Both of those are common to every method, so dropping them leaves only what actually distinguishes the four: the shape of the trust region and how sharply the gate falls off at its edge.
+Three of the four token-level methods switch on $\mathrm{sign}(A_t)$, so the gate is still a function of both coordinates — hence the semicolon — but it carries no factor of $A_t$ and no factor of $\rho_t$. Both of those are common to every method, so dropping them leaves only what actually distinguishes the four: the shape of the trust region and how sharply the gate falls off at its edge.
 
-Table 1 summarizes the four gates. PPO and GRPO use the same clipped policy loss; they differ elsewhere, most notably in how they estimate $A_t$. The table likewise isolates DAPO's and SAO's ratio-handling rules rather than their complete training algorithms. GSPO is deliberately absent from it: it reuses PPO's gate unchanged and swaps the argument instead, so it gets [its own section](#gspo-the-same-gate-a-different-unit) below.
+Table 1 summarizes the gates — four distinct choices of $f$, since GSPO reuses one. PPO and GRPO use the same clipped policy loss; they differ elsewhere, most notably in how they estimate $A_t$. The table likewise isolates DAPO's and SAO's ratio-handling rules rather than their complete training algorithms. GSPO's row is the same $f$ as DAPO's evaluated at the sequence pair $(\rho_s,A_s)$ instead of the token pair; [its own section](#gspo-the-same-f-one-subscript-changed) below unpacks what that substitution does and does not carry over.
 
 | Method | $f(\rho_t;A_t)$ | $f'(\rho_t;A_t)$ | Effect |
 | --- | --- | --- | --- |
 | [PPO](https://arxiv.org/abs/1707.06347) (July 2017) / [GRPO](https://arxiv.org/abs/2402.03300) (February 2024) | $A_t>0:\min(\rho_t,1+\epsilon)$; $A_t\leq0:\max(\rho_t,1-\epsilon)$ | $1$ before the sign-dependent clip boundary, $0$ after it | Hard, asymmetric gating based on the sign of $A_t$ |
 | [DAPO](https://arxiv.org/abs/2503.14476) (March 2025) | $A_t>0:\min(\rho_t,1+\epsilon_{\mathrm{high}})$; $A_t\leq0:\max(\rho_t,1-\epsilon_{\mathrm{low}})$ | The same binary gate, with separate upper and lower boundaries | A higher upper bound leaves more room to increase useful low-probability tokens |
+| [GSPO](https://arxiv.org/abs/2507.18071) (July 2025) | The same as DAPO's, at $(\rho_s,A_s)$: $A_s>0:\min(\rho_s,1+\epsilon_{\mathrm{high}})$; $A_s\leq0:\max(\rho_s,1-\epsilon_{\mathrm{low}})$ | The same binary gate, in $\rho_s$ rather than $\rho_t$ | One clip decision per response instead of per token |
 | [SAO](https://arxiv.org/abs/2607.07508) (July 2026) | $\widetilde f(\rho_t)=\operatorname{clip}(\rho_t,1-\epsilon_{\mathrm{low}},1+\epsilon_{\mathrm{high}})$ | $\mathbf{1}[1-\epsilon_{\mathrm{low}}<\rho_t<1+\epsilon_{\mathrm{high}}]$ | Both signs are masked whenever the ratio leaves the trust region |
 | [SAPO](https://arxiv.org/abs/2511.20347) (November 2025) | $\dfrac{4}{\tau_t}\sigma\!\left(\tau_t(\rho_t-1)\right)$ | $4\sigma(z_t)(1-\sigma(z_t))=\mathrm{sech}^2(z_t/2)$ | The gate decays smoothly instead of switching abruptly to zero |
 
@@ -211,67 +212,66 @@ The plots use illustrative parameters to make these differences visible: $\epsil
 
 PPO and DAPO decide whether a token has moved too far in the direction encouraged by its advantage. SAO rejects any token that has moved too far in either direction. SAPO replaces that binary decision with a continuously varying weight.
 
-## GSPO: the same gate, a different unit
+## GSPO: the same $f$, one subscript changed
 
-[GSPO](https://arxiv.org/abs/2507.18071) (July 2025) fits this framework, but not by adding a fifth $f$. Its objective is PPO's `min`/`clip` copied verbatim, with the token ratio and token advantage swapped for their sequence-level counterparts:
+[GSPO](https://arxiv.org/abs/2507.18071) (July 2025) needs no new $f$ at all. Take the row PPO already occupies and replace the token pair by the sequence pair:
 
 $$
-J_{\mathrm{GSPO}}(\theta)
+f(\rho_t;A_t)\;\longrightarrow\;f(\rho_s;A_s).
+$$
+
+That is the entire method. $A_s$ is the group-normalized advantage of the whole response — the quantity GRPO already computes, before it gets broadcast to tokens — and $\rho_s$ is the *length-normalized* sequence likelihood ratio:
+
+$$
+\rho_s(\theta)
 =
-\mathbb{E}\left[
-\frac{1}{G}\sum_{i=1}^{G}
-\min\left(
-s_i(\theta)\widehat A_i,\;
-\operatorname{clip}(s_i(\theta),1-\epsilon,1+\epsilon)\widehat A_i
-\right)
-\right],
-$$
-
-where the ratio is the *length-normalized* sequence likelihood ratio
-
-$$
-s_i(\theta)
-=
-\left(\frac{\pi_\theta(y_i\mid x)}{\pi_{\mathrm{old}}(y_i\mid x)}\right)^{1/|y_i|}
+\left(\frac{\pi_\theta(y\mid x)}{\pi_{\mathrm{old}}(y\mid x)}\right)^{1/|y|}
 =
 \exp\left(
-\frac{1}{|y_i|}\sum_{t=1}^{|y_i|}
-\log\frac{\pi_\theta(y_{i,t}\mid x,y_{i,<t})}{\pi_{\mathrm{old}}(y_{i,t}\mid x,y_{i,<t})}
-\right).
+\frac{1}{|y|}\sum_{t=1}^{|y|}
+\log\rho_t
+\right),
 $$
 
-So the gate is exactly the one already in Table 1, read on new coordinates:
+the geometric mean of the token ratios already in play. (The paper writes these $s_i$ and $\widehat A_i$; I keep $\rho_s,A_s$ so the substitution stays legible.) Everything downstream follows by the same substitution — the objective is PPO's `min`/`clip` verbatim,
 
 $$
-f'(s_i;\widehat A_i)
+J_s(\theta) = \min\left(
+\rho_s A_s,\;
+\operatorname{clip}(\rho_s, 1-\epsilon_l, 1+\epsilon_h)A_s
+\right),
+$$
+
+and so is the gate:
+
+$$
+f'(\rho_s;A_s)
 =
-\mathbf{1}\!\left[\widehat A_i>0,\; s_i<1+\epsilon_h\right]
+\mathbf{1}\!\left[A_s>0,\; \rho_s<1+\epsilon_h\right]
 +
-\mathbf{1}\!\left[\widehat A_i<0,\; s_i>1-\epsilon_l\right].
+\mathbf{1}\!\left[A_s<0,\; \rho_s>1-\epsilon_l\right].
 $$
 
-[Figure 6](#figure-gspo-gradient-weight) is therefore the same two-wedge picture as Figures 2 and 3. Two things do change, and neither is visible in the algebra.
+[Figure 6](#figure-gspo-gradient-weight) is therefore Figure 3 with relabelled axes — DAPO's asymmetric two-wedge shape, since GSPO's left and right ranges differ. Only two things are not carried over by the substitution.
 
-**The scale changes by three orders of magnitude.** Because $s_i$ is a geometric mean over $|y_i|$ token ratios, it concentrates near 1 far more tightly than any individual $\rho_t$; a window of width $0.2$ around it would essentially never bind. GSPO's reported clipping ranges are $3\times10^{-4}$ (left) and $4\times10^{-4}$ (right), against GRPO's $0.2$-scale. Figure 6 uses those published values rather than the exaggerated ones used elsewhere in this post, because here the magnitude *is* the content. [Figure 7](#figure-gspo-scale-contrast) draws the two windows against each other: GSPO's entire ratio axis, plotted to scale inside PPO's plane, is thinner than the line pointing at it.
+**The scale is three orders of magnitude smaller.** A geometric mean over $|y|$ token ratios concentrates near 1 far more tightly than any single $\rho_t$, so a window of width $0.2$ around $\rho_s$ would essentially never bind. GSPO's reported ranges are $\epsilon_l=3\times10^{-4}$ and $\epsilon_h=4\times10^{-4}$, against GRPO's $0.2$. Figure 6 uses those published values rather than the exaggerated ones used elsewhere in this post, because here the magnitude *is* the content, and [Figure 7](#figure-gspo-scale-contrast) makes the gap the subject: GSPO's entire ratio axis, drawn to scale inside PPO's plane, is thinner than the line pointing at it. This is also why GSPO is not a fifth panel in Figures 2–5 — on a shared ratio axis it would be a hairline.
 
-**The gating unit changes from token to sequence.** The gradient (Eq. 10 of the paper) is
+**The gate now fires once per response, not once per token.** Differentiating gives
 
 $$
-\nabla_\theta J_{\mathrm{GSPO}}
+\nabla_\theta J_s
 =
-\mathbb{E}\left[
-\frac{1}{G}\sum_{i=1}^{G}
-s_i(\theta)\,\widehat A_i \cdot
-\frac{1}{|y_i|}\sum_{t=1}^{|y_i|}
-\nabla_\theta\log\pi_\theta(y_{i,t}\mid x,y_{i,<t})
-\right],
+f'(\rho_s;A_s)\,
+\rho_s A_s \cdot
+\frac{1}{|y|}\sum_{t=1}^{|y|}
+\nabla_\theta\log\pi_\theta(y_t\mid x,y_{<t}),
 $$
 
-so the "shared" factor is no longer $\rho_t A_t\nabla_\theta\log\pi_\theta$ at token $t$; it is $s_i\widehat A_i$ times the *sequence-averaged* score function. One gate decision now covers every token in the response — all $|y_i|$ of them survive together or die together. That is the whole argument of the paper: the clipping unit should match the rewarding unit, and a token-level ratio is a noisy estimate of a quantity the reward never referred to. It is also the one thing the $(A_t,\log\rho_t)$ plane cannot show, because after this substitution it is no longer a per-token plane.
+which is the same $f'\cdot\rho\,A\,\nabla\log\pi$ shape as before, except that the score function is now *averaged over the response* rather than evaluated at token $t$. So a single gate decision covers all $|y|$ tokens: they survive together or they are dropped together. That is the paper's actual claim — the clipping unit should match the rewarding unit, since the reward was never a statement about token $t$ in the first place.
 
 <figure id="figure-gspo-gradient-weight">
   <img src="{{ '/assets/figures/mental-model-policy-optimizations/gspo-gradient-weight-heatmap.png' | relative_url }}" alt="GSPO gradient-weight heatmap on the sequence-advantage / log-sequence-ratio plane">
-  <figcaption><strong>Figure 6.</strong> GSPO, on the $(\widehat A_i,\log s_i)$ plane. The gate has the same two-wedge shape as PPO and DAPO — separate left and right ranges make it DAPO's asymmetric version — but the axis spans $\pm10^{-3}$, not $\pm0.6$.</figcaption>
+  <figcaption><strong>Figure 6.</strong> GSPO, on the $(A_s,\log\rho_s)$ plane. Identical to Figure 3 apart from the labels — separate left and right ranges make it DAPO's asymmetric two-wedge gate — except that the vertical axis spans $\pm10^{-3}$, not $\pm0.6$.</figcaption>
 </figure>
 
 <figure id="figure-gspo-scale-contrast">
@@ -279,6 +279,6 @@ so the "shared" factor is no longer $\rho_t A_t\nabla_\theta\log\pi_\theta$ at t
   <figcaption><strong>Figure 7.</strong> The same gate on two scales. Left: PPO/GRPO at $\epsilon=0.2$ on the token ratio. Right: GSPO at its published ranges on the sequence ratio. The red line in the left panel is the right panel's full extent drawn to scale — about $600\times$ shorter than the axis containing it.</figcaption>
 </figure>
 
-A token-level variant, GSPO-token, restores per-token advantages while keeping $s_i$ as the clipping quantity; when all $\widehat A_{i,t}$ in a response are equal it is numerically identical to GSPO.
+A token-level variant, GSPO-token, restores per-token advantages while keeping $\rho_s$ as the clipping quantity; when every token in a response carries the same advantage it is numerically identical to GSPO.
 
 other references: https://qwen.ai/blog?id=sapo
