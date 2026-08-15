@@ -86,6 +86,9 @@
 *, *::before, *::after { box-sizing: border-box; }
 
 html {
+  /* Root scale: every rem below is relative to this, so one knob sizes the
+     whole page. 112.5% of the 16px default = 18px base. */
+  font-size: 112.5%;
   -webkit-text-size-adjust: 100%;
   scroll-behavior: smooth;
 }
@@ -466,10 +469,11 @@ code, kbd, samp, pre { font-family: var(--font-mono); font-size: 0.86em; }
 .post-content figcaption,
 .post-content p:has(> img:only-child) + p > em:only-child {
   display: block;
-  margin-top: 0.6rem;
+  margin-top: 0.7rem;
   font-family: var(--font-mono);
-  font-size: 0.75rem;
-  letter-spacing: 0.03em;
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  letter-spacing: 0.02em;
   color: var(--muted);
   text-align: center;
   font-style: normal;
