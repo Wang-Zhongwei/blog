@@ -175,12 +175,12 @@ $$
 Once the candidate set has been sampled, the Gibbs policy and its expected reward, KL divergence, and free energy can all be evaluated exactly on that set. Sweeping $$\beta$$ traces the optimal reward–KL frontier in [Figure 1](#figure-reward-kl-frontier) and the corresponding free-energy landscape in [Figure 2](#figure-free-energy-landscape). Figure 1 also compares two ways of defining the reference weights: full-sequence probability and length-normalized probability. The remaining experiments use full-sequence probability.
 
 <figure id="figure-reward-kl-frontier">
-  <img src="{{ '/assets/figures/reward-kl-frontier.png' | relative_url }}" alt="Reward–KL frontier across beta values">
+  <img src="{{ '/assets/figures/a-physicists-dictionary-for-dpo/reward-kl-frontier.png' | relative_url }}" alt="Reward–KL frontier across beta values">
   <figcaption><strong>Figure 1.</strong> Reward–KL frontier across \(\beta\), comparing sequence probability with length-normalized probability.</figcaption>
 </figure>
 
 <figure id="figure-free-energy-landscape">
-  <img src="{{ '/assets/figures/free-energy-landscape.png' | relative_url }}" alt="Free-energy landscape across beta values">
+  <img src="{{ '/assets/figures/a-physicists-dictionary-for-dpo/free-energy-landscape.png' | relative_url }}" alt="Free-energy landscape across beta values">
   <figcaption><strong>Figure 2.</strong> Free-energy landscape across \(\beta\); color indicates the KL-based gap to the Gibbs optimum.</figcaption>
 </figure>
 
@@ -193,7 +193,7 @@ At the reference policy the KL term is zero, so $$\mathcal{F}_{\beta}[\pi_{\math
 To test this, I ran a GRPO-family trainer separately for $$\beta\in\{0.01,0.02,0.05,0.1,0.2\}$$, using group size $$G=32$$, 6,500 GSM8K training prompts, for about one epoch (262,144 rollouts). I saved checkpoints every 32,768 rollouts and evaluated each checkpoint on the same 500 held-out prompts. The reference model starts at an expected reward of 0.348.
 
 <figure id="figure-training-free-energy-decomposition">
-  <img src="{{ '/assets/figures/training-free-energy-decomposition.png' | relative_url }}" alt="Training-time free-energy decomposition across KL penalty values">
+  <img src="{{ '/assets/figures/a-physicists-dictionary-for-dpo/training-free-energy-decomposition.png' | relative_url }}" alt="Training-time free-energy decomposition across KL penalty values">
   <figcaption><strong>Figure 3.</strong> Training-time free-energy decomposition across KL penalties \(\beta\): reward, KL, and total free-energy terms on held-out validation.</figcaption>
 </figure>
 

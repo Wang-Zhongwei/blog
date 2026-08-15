@@ -1,16 +1,21 @@
-"""Per-token gradient weight for the clip-family surrogates, on the (A_t, log rho_t) plane.
+"""Per-token gradient gate for the clip-family surrogates, on the (A_t, log rho_t) plane.
 
 All of these objectives share the shape J = E[f(rho_t) A_t]. What is plotted here
-is the sensitivity of that objective to the ratio,
+is the gate alone,
 
-    dJ/drho_t = f'(rho_t) * A_t,
+    f'(rho_t; A_t),
 
-which is what decides whether a token contributes at all and with what sign.
+the factor each method puts in front of the advantage. Since three of the four
+switch on sign(A_t), the gate itself is a function of both coordinates -- hence
+the semicolon -- but it carries no factor of A_t. Dropping that factor is what
+makes the panels comparable: the shape of the trust region is the whole story,
+and multiplying by A_t only tilts every panel the same way.
 
-NOTE: this is NOT the coefficient on grad log pi. Since drho_t/dtheta = rho_t *
-grad log pi, that coefficient carries an extra factor of rho_t:
+NOTE: neither this nor f' * A_t is the coefficient on grad log pi. Since
+drho_t/dtheta = rho_t * grad log pi, that coefficient carries an extra factor of
+rho_t:
 
-    grad J = f'(rho_t) * rho_t * A_t * grad log pi.
+    grad J = f'(rho_t; A_t) * rho_t * A_t * grad log pi.
 
 The rho_t factor is common to every method, so it does not affect the comparison
 between panels, but it does matter for the tail: f' -> 0 does not by itself mean
@@ -43,7 +48,7 @@ from pathlib import Path
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-from matplotlib.colors import LinearSegmentedColormap, TwoSlopeNorm
+from matplotlib.colors import LinearSegmentedColormap, Normalize
 
 A_LIM = 1.0
 LOG_RHO_LIM = 0.6
@@ -71,8 +76,10 @@ INK_SECONDARY = "#52514e"
 INK_MUTED = "#898781"
 AXIS = "#c3c2b7"
 
-# Diverging pair: red (positive advantage) <-> blue (negative advantage),
-# neutral gray at zero so "no gradient" reads as nothing rather than as a hue.
+# Both panels of a method figure share one diverging scale, so the gate (which
+# only ever occupies 0..1) can be compared directly against the signed effective
+# weight beside it. Neutral gray at zero so "no gradient" reads as nothing rather
+# than as a hue; red is a positive update, blue a negative one.
 BLUE_ARM = ["#cde2fb", "#9ec5f4", "#5598e7", "#2a78d6", "#184f95"]
 RED_ARM = ["#fbdad7", "#f6b3ad", "#ec7d74", "#d03b3b", "#8f2020"]
 NEUTRAL = "#f0efec"
@@ -80,12 +87,32 @@ DIVERGING = LinearSegmentedColormap.from_list(
     "advantage_diverging", BLUE_ARM[::-1] + [NEUTRAL] + RED_ARM
 )
 
+# Symmetric limit for that shared scale. The largest attainable |f' rho A| on
+# this window is A_LIM * exp(LOG_RHO_LIM) = 1.822 (PPO and DAPO both reach it in
+# the A_t < 0 corner), so this covers every panel with a little headroom.
+COEF_LIM = 1.85
+
 LABEL_BOX = dict(boxstyle="round,pad=0.25", facecolor=SURFACE, edgecolor="none", alpha=0.92)
 DASH = (0, (5, 4))
 # f' iso-levels drawn on the SAPO panel. Each level appears as up to four
 # segments -- one per quadrant -- since tau switches on sign(A_t) and the
 # sigmoid has an upper and a lower branch.
 SAPO_LEVELS = [0.9, 0.8, 0.7]
+
+# The effective-coefficient figure needs a much wider ratio window than the
+# heatmaps: SAPO's f' * rho does not break away from the clip family's shared
+# rho ramp until |log rho| ~ 1.5, well outside LOG_RHO_LIM.
+EFF_LOG_RHO_LIM = 2.0
+
+# Distinct linestyles matter more than distinct hues here, because several of
+# these curves coincide exactly over parts of the range (PPO and DAPO for
+# A_t < 0; DAPO and SAO above the shared upper bound for A_t > 0).
+METHOD_STYLE = {
+    "ppo": dict(color=INK_PRIMARY, linestyle="-", linewidth=3.2),
+    "dapo": dict(color="#5598e7", linestyle=(0, (6, 3)), linewidth=2.0),
+    "sao": dict(color="#d03b3b", linestyle=(0, (2, 2.5)), linewidth=2.0),
+    "sapo": dict(color="#184f95", linestyle="-", linewidth=2.6),
+}
 
 
 # --- f'(rho) per method -------------------------------------------------------
@@ -238,16 +265,27 @@ def grids():
     return adv, log_rho, np.exp(log_rho)
 
 
-def draw_panel(ax, method, adv, log_rho, rho, *, short_labels=False, boundary_labels=True):
+def draw_panel(
+    ax,
+    method,
+    adv,
+    log_rho,
+    rho,
+    *,
+    quantity="gate",
+    short_labels=False,
+    boundary_labels=True,
+    regions=True,
+):
     fprime = method["fprime"](adv, rho)
-    weight = fprime * adv
+    field = fprime if quantity == "gate" else fprime * rho * adv
 
     mesh = ax.pcolormesh(
         adv,
         log_rho,
-        weight,
+        field,
         cmap=DIVERGING,
-        norm=TwoSlopeNorm(vmin=-A_LIM, vcenter=0.0, vmax=A_LIM),
+        norm=Normalize(vmin=-COEF_LIM, vmax=COEF_LIM),
         shading="auto",
         rasterized=True,
     )
@@ -255,7 +293,7 @@ def draw_panel(ax, method, adv, log_rho, rho, *, short_labels=False, boundary_la
     if method["kind"] == "clip":
         # Secondary encoding: hatch the zero-gradient region so "nothing happens
         # here" is not carried by color alone.
-        dead = np.ma.masked_where(fprime > 0, np.ones_like(weight))
+        dead = np.ma.masked_where(fprime > 0, np.ones_like(fprime))
         ax.contourf(adv, log_rho, dead, levels=[0.5, 1.5], colors="none", hatches=["//////"])
         for level, label, va, offset in method["boundaries"]:
             ax.axhline(level, color=INK_SECONDARY, linestyle=DASH, linewidth=1.6)
@@ -301,7 +339,7 @@ def draw_panel(ax, method, adv, log_rho, rho, *, short_labels=False, boundary_la
     ax.axhline(0.0, color=AXIS, linewidth=1.0)
     ax.axvline(0.0, color=AXIS, linewidth=1.0)
 
-    for x, y, text in method["short_regions" if short_labels else "regions"]:
+    for x, y, text in method["short_regions" if short_labels else "regions"] if regions else ():
         ax.annotate(
             text,
             xy=(x, y),
@@ -321,24 +359,53 @@ def draw_panel(ax, method, adv, log_rho, rho, *, short_labels=False, boundary_la
 
 
 def style_colorbar(cbar):
-    cbar.set_label(r"$f'(\rho_t)\,A_t$", color=INK_SECONDARY)
+    # No label: each panel is already titled with the quantity it shows, and the
+    # scale is shared, so a colorbar caption would only repeat both titles.
     cbar.outline.set_visible(False)
     cbar.ax.tick_params(color=INK_MUTED, labelcolor=INK_MUTED)
 
 
 def render_single(method, adv, log_rho, rho, out_dir):
-    fig, ax = plt.subplots(figsize=(7.0, 4.6))
-    mesh = draw_panel(ax, method, adv, log_rho, rho)
-    ax.set_xlabel(r"advantage  $A_t$")
-    ax.set_ylabel(r"log importance ratio  $\log \rho_t$")
-    ax.set_title(
+    """Two panels per method: the bare gate, and the gate times the shared factor.
+
+    Both are drawn on one symmetric diverging scale (+/- COEF_LIM) with a single
+    colorbar, so the panels are directly comparable to each other and the same
+    scale is used across all four methods. The gate only occupies 0..1 of that
+    range, which is the point: it shows how much of the full weight the gate
+    accounts for, and how much comes from rho_t A_t.
+    """
+    fig, axes = plt.subplots(1, 2, figsize=(12.6, 4.6), sharey=True)
+
+    mesh = draw_panel(axes[0], method, adv, log_rho, rho, quantity="gate")
+    draw_panel(
+        axes[1],
+        method,
+        adv,
+        log_rho,
+        rho,
+        quantity="coefficient",
+        boundary_labels=False,
+        regions=False,
+    )
+
+    axes[0].set_title(r"gate  $f'(\rho_t;A_t)$", color=INK_PRIMARY, fontsize=13, pad=10)
+    axes[1].set_title(
+        r"effective weight  $f'(\rho_t;A_t)\,\rho_t A_t$",
+        color=INK_PRIMARY,
+        fontsize=13,
+        pad=10,
+    )
+    for ax in axes:
+        ax.set_xlabel(r"advantage  $A_t$")
+    axes[0].set_ylabel(r"log importance ratio  $\log \rho_t$")
+
+    fig.suptitle(
         rf"{method['name']}   ({method['params']})",
         color=INK_PRIMARY,
-        fontsize=14,
-        pad=12,
+        fontsize=15,
+        y=0.99,
     )
-    style_colorbar(fig.colorbar(mesh, ax=ax, pad=0.02))
-    fig.tight_layout()
+    style_colorbar(fig.colorbar(mesh, ax=axes, pad=0.015, fraction=0.035))
     save(fig, out_dir / f"{method['key']}-gradient-weight-heatmap")
     plt.close(fig)
 
@@ -360,6 +427,77 @@ def render_comparison(adv, log_rho, rho, out_dir):
     plt.close(fig)
 
 
+def render_effective_coefficient(out_dir):
+    """f'(rho; A) * rho over a wide ratio window, at |A_t| = 1.
+
+    The heatmaps deliberately strip the shared rho_t factor. This figure puts it
+    back, because for SAPO the product is where the real behaviour lives: the
+    sech^2 decay and the linear growth in rho nearly cancel over the heatmaps'
+    +/-0.6 window (f' rho falls only from 1.00 to 0.99), so SAPO's attenuation is
+    invisible at that zoom. Widened to +/-2 the cancellation breaks and the
+    coefficient collapses to zero -- smoothly, where the clip family falls off a
+    cliff.
+
+    Two panels because f' switches on sign(A_t). Note that PPO and DAPO coincide
+    exactly on the A_t < 0 panel: DAPO only moves the upper bound.
+    """
+    log_rho = np.linspace(-EFF_LOG_RHO_LIM, EFF_LOG_RHO_LIM, 4001)
+    rho = np.exp(log_rho)
+
+    fig, axes = plt.subplots(1, 2, figsize=(12.5, 4.6), sharey=True)
+    for ax, sign, title in (
+        (axes[0], 1.0, r"$A_t > 0$"),
+        (axes[1], -1.0, r"$A_t < 0$"),
+    ):
+        adv = np.full_like(rho, sign)
+        for method in METHODS:
+            style = METHOD_STYLE[method["key"]]
+            ax.plot(
+                log_rho,
+                method["fprime"](adv, rho) * rho,
+                label=method["name"],
+                **style,
+            )
+        ax.axvline(0.0, color=AXIS, linewidth=1.0)
+        ax.axhline(0.0, color=AXIS, linewidth=1.0)
+        # Mark the heatmaps' window so the two figures can be read together.
+        ax.axvspan(-LOG_RHO_LIM, LOG_RHO_LIM, color=NEUTRAL, zorder=0)
+        ax.set_xlabel(r"log importance ratio  $\log \rho_t$")
+        ax.set_title(title, color=INK_PRIMARY, fontsize=13, pad=10)
+        ax.set_xlim(-EFF_LOG_RHO_LIM, EFF_LOG_RHO_LIM)
+        for spine in ("top", "right"):
+            ax.spines[spine].set_visible(False)
+
+    axes[0].set_ylabel(r"effective weight  $f'(\rho_t;A_t)\,\rho_t$")
+    axes[0].set_ylim(0.0, 2.1)
+    # Top-right of the A_t > 0 panel is empty -- every curve has decayed by then.
+    axes[0].text(
+        1.25,
+        1.95,
+        "shaded: window\nof Figures 2–5",
+        ha="center",
+        va="top",
+        fontsize=9.5,
+        color=INK_MUTED,
+    )
+    # The headline of this figure: for A_t < 0 neither PPO nor DAPO imposes an
+    # upper bound, so past SAO's cliff their weight just keeps growing with rho.
+    axes[1].annotate(
+        "PPO and DAPO coincide, and keep growing:\n"
+        r"no upper bound when $A_t<0$",
+        xy=(0.78, 2.02),
+        xytext=(-1.92, 1.62),
+        fontsize=10,
+        color=INK_SECONDARY,
+        bbox=LABEL_BOX,
+        arrowprops=dict(arrowstyle="->", color=INK_MUTED, linewidth=1.1),
+    )
+    axes[0].legend(frameon=False, fontsize=10.5, loc="upper left")
+    fig.tight_layout()
+    save(fig, out_dir / "effective-coefficient-curves")
+    plt.close(fig)
+
+
 def save(fig, stem):
     fig.savefig(stem.with_suffix(".png"), dpi=200)
     fig.savefig(stem.with_suffix(".pdf"))
@@ -374,6 +512,7 @@ def main():
     for method in METHODS:
         render_single(method, adv, log_rho, rho, out_dir)
     render_comparison(adv, log_rho, rho, out_dir)
+    render_effective_coefficient(out_dir)
 
 
 if __name__ == "__main__":
