@@ -1,0 +1,12 @@
+{%- assign word_count = include.body | strip_html | split: " " | size -%}
+{%- assign reading_minutes = word_count | plus: 199 | divided_by: 200 -%}
+{%- if reading_minutes < 1 -%}
+  {%- assign reading_minutes = 1 -%}
+{%- endif -%}
+<div class="post-meta">
+  <time datetime="{{ include.item.date | date_to_xmlschema }}">
+    {{ include.item.date | date: include.date_format }}
+  </time>
+  <span aria-hidden="true">&middot;</span>
+  <span>{{ reading_minutes }} min read</span>
+</div>

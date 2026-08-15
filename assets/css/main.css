@@ -86,6 +86,9 @@
 *, *::before, *::after { box-sizing: border-box; }
 
 html {
+  /* Root scale: every rem below is relative to this, so one knob sizes the
+     whole page. 112.5% of the 16px default = 18px base. */
+  font-size: 112.5%;
   -webkit-text-size-adjust: 100%;
   scroll-behavior: smooth;
 }
@@ -95,7 +98,7 @@ body {
   background: var(--bg);
   color: var(--ink-soft);
   font-family: var(--font-body);
-  font-size: 1.0625rem;
+  font-size: 1.2rem;
   line-height: 1.72;
   font-optical-sizing: auto;
   -webkit-font-smoothing: antialiased;
@@ -136,13 +139,12 @@ a:hover { color: var(--hot-bright); }
 }
 
 /* Utility label register — mono, spaced, small caps feel. */
-.label,
-.post-date,
+.post-meta,
 .site-nav,
 .read-more,
 .tag-list li {
   font-family: var(--font-mono);
-  font-size: 0.72rem;
+  font-size: 0.8125rem;
   font-weight: 500;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -172,7 +174,7 @@ a:hover { color: var(--hot-bright); }
 .site-title {
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 1.15rem;
+  font-size: 1.3rem;
   letter-spacing: 0.01em;
   color: var(--ink);
   text-decoration: none;
@@ -273,7 +275,7 @@ a:hover { color: var(--hot-bright); }
 .intro-tagline {
   margin: 1rem 0 0;
   color: var(--muted);
-  font-size: 1.12rem;
+  font-size: 1.26rem;
   font-style: italic;
   max-width: 34rem;
 }
@@ -292,7 +294,12 @@ a:hover { color: var(--hot-bright); }
 }
 .post-item:first-child { border-top: none; padding-top: 0; }
 
-.post-date { display: block; color: var(--muted); }
+.post-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  color: var(--muted);
+}
 
 .post-item-title {
   font-family: var(--font-display);
@@ -334,8 +341,6 @@ a:hover { color: var(--hot-bright); }
   padding-inline: var(--gutter);
 }
 
-.post-header .post-date { color: var(--muted); }
-
 .post-title {
   font-family: var(--font-display);
   font-weight: 700;
@@ -350,7 +355,7 @@ a:hover { color: var(--hot-bright); }
 .post-subtitle {
   margin: 0.9rem 0 0;
   color: var(--muted);
-  font-size: 1.2rem;
+  font-size: 1.35rem;
   font-style: italic;
   line-height: 1.5;
 }
@@ -390,9 +395,9 @@ a:hover { color: var(--hot-bright); }
   text-wrap: balance;
   margin-top: 1em;   /* sits on top of the column gap */
 }
-.post-content h2 { font-size: 1.85rem; }
-.post-content h3 { font-size: 1.35rem; }
-.post-content h4 { font-size: 1.1rem; font-family: var(--font-body); }
+.post-content h2 { font-size: 2.08rem; }
+.post-content h3 { font-size: 1.52rem; }
+.post-content h4 { font-size: 1.24rem; font-family: var(--font-body); }
 
 .post-content strong { color: var(--ink); font-weight: 600; }
 .post-content em { font-style: italic; }
@@ -466,10 +471,11 @@ code, kbd, samp, pre { font-family: var(--font-mono); font-size: 0.86em; }
 .post-content figcaption,
 .post-content p:has(> img:only-child) + p > em:only-child {
   display: block;
-  margin-top: 0.6rem;
+  margin-top: 0.7rem;
   font-family: var(--font-mono);
-  font-size: 0.75rem;
-  letter-spacing: 0.03em;
+  font-size: 1.05rem;
+  line-height: 1.55;
+  letter-spacing: 0.02em;
   color: var(--muted);
   text-align: center;
   font-style: normal;
@@ -479,7 +485,7 @@ code, kbd, samp, pre { font-family: var(--font-mono); font-size: 0.86em; }
 
 .post-content table {
   border-collapse: collapse;
-  font-size: 0.95rem;
+  font-size: 1.07rem;
   display: block;
   overflow-x: auto;
 }
@@ -492,13 +498,17 @@ code, kbd, samp, pre { font-family: var(--font-mono); font-size: 0.86em; }
 }
 .post-content th {
   font-family: var(--font-mono);
-  font-size: 0.7rem;
+  font-size: 0.79rem;
   font-weight: 500;
   letter-spacing: 0.09em;
   text-transform: uppercase;
   color: var(--ink);
   border-bottom: 1px solid var(--muted);
   white-space: nowrap;
+}
+.post-content th mjx-container {
+  letter-spacing: normal;
+  text-transform: none;
 }
 .post-content tbody tr:hover { background: var(--accent-soft); }
 
@@ -517,10 +527,26 @@ mjx-container { color: var(--ink); }
 /* Footnotes & post footer -------------------------------------------------- */
 
 .footnotes {
-  font-size: 0.92rem;
+  font-size: 1.03rem;
   color: var(--muted);
   border-top: 1px solid var(--rule);
   padding-top: 1.25rem;
+}
+
+/* Kramdown's default back-reference glyph (an underlined, accent-colored
+   "↩" glued to the end of each footnote) fights the citation links inside
+   the same footnote for the same color. Mute it to a quiet affordance and
+   only bring back the accent on hover/focus. */
+.footnotes .reversefootnote {
+  margin-left: 0.4em;
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 0.85em;
+  transition: color 0.15s ease;
+}
+.footnotes .reversefootnote:hover,
+.footnotes .reversefootnote:focus-visible {
+  color: var(--hot);
 }
 
 .post-footer {
@@ -538,7 +564,7 @@ mjx-container { color: var(--ink); }
   border-top: 1px solid var(--rule);
   padding-block: 1.5rem;
   color: var(--muted);
-  font-size: 0.82rem;
+  font-size: 0.92rem;
 }
 .footer-inner {
   display: flex;
