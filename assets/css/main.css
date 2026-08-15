@@ -98,7 +98,7 @@ body {
   background: var(--bg);
   color: var(--ink-soft);
   font-family: var(--font-body);
-  font-size: 1.2rem;
+  font-size: 1rem;
   line-height: 1.72;
   font-optical-sizing: auto;
   -webkit-font-smoothing: antialiased;
@@ -510,6 +510,9 @@ code, kbd, samp, pre { font-family: var(--font-mono); font-size: 0.86em; }
   letter-spacing: normal;
   text-transform: none;
 }
+/* Unwrappable math cells take their full width and crush prose columns into
+   sliver-thin, very tall ones; floor the text cells and let the table scroll. */
+.post-content td:not(:has(mjx-container)) { min-width: 12rem; }
 .post-content tbody tr:hover { background: var(--accent-soft); }
 
 /* Math -------------------------------------------------------------------- */
@@ -521,6 +524,9 @@ mjx-container[display="true"] {
   overflow-y: hidden;
   padding-block: 0.35rem;
   max-width: 100%;
+  /* \tag'd equations carry an inline min-width for the number, which outranks
+     max-width and would stretch the box instead of letting it scroll. */
+  min-width: 0 !important;
 }
 mjx-container { color: var(--ink); }
 
