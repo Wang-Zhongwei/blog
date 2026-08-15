@@ -11,63 +11,83 @@ Preference post-training is often formulated as **KL-regularized reward maximiza
 $$
 \pi_\beta^\ast(y|x) = 
 \frac{\pi_{\mathrm{ref}}(y|x)e^{r(x,y)/\beta}}{Z(x)},
+\tag{1}\label{eq:gibbs-policy}
 $$
 
-where $$Z(x)$$ is the partition function. This same structure underlies DPO’s derivation and KL-regularized RLHF methods such as PPO- and GRPO-style training.[^ppo]
+where $Z(x)$ is the partition function defined in eq. (13). This same structure underlies DPO's derivation[^dpo] and KL-regularized RLHF methods such as PPO- and GRPO-style training.[^ppo]
 
-[^ppo]: PPO does not optimize this objective directly: it maximizes a clipped surrogate in the ratio $$\rho=\pi_\theta/\pi_{\theta_{\mathrm{old}}}$$. But at the start of each update, where $$\pi_\theta=\pi_{\theta_{\mathrm{old}}}$$, the clip is inactive and $$\nabla_\theta\,\rho A=\nabla_\theta \log\pi_\theta\,A$$—the vanilla policy gradient. With the KL-to-reference penalty folded into the reward, PPO therefore locally ascends the same KL-regularized objective; clipping only limits the step size.
+Most explanations—including [Karina Zadorozhny’s post-training guide](https://huggingface.co/blog/karina-zadorozhny/guide-to-llm-post-training-algorithms) and [Ari G’s RLHF-to-DPO walkthrough](https://huggingface.co/blog/ariG23498/rlhf-to-dpo)—essentially stop there. They introduce $Z(x)$, note its connection to statistical physics, observe that it is intractable but conveniently cancels from the pairwise DPO loss, derive the optimal policy in eq. (1), and move on.
 
-Most explanations—including [Karina Zadorozhny’s post-training guide](https://huggingface.co/blog/karina-zadorozhny/guide-to-llm-post-training-algorithms) and [Ari G’s RLHF-to-DPO walkthrough](https://huggingface.co/blog/ariG23498/rlhf-to-dpo)—essentially stop there. They introduce $$Z(x)$$, note its connection to statistical physics, observe that it is intractable but conveniently cancels from the pairwise DPO loss, derive the optimal policy, and move on.
+**But in statistical mechanics, writing down the partition function is not the end of the derivation. It is the beginning.** Once $Z$ is defined in eq. (13), free energy, internal energy, entropy, and temperature follow, together with a precise characterization of equilibrium. The KL-regularized RL objective admits an almost term-by-term version of the same structure.
 
-**But in statistical mechanics, writing down the partition function is not the end of the derivation. It is the beginning.** Once $$Z$$ is defined, free energy, internal energy, entropy, and temperature follow, together with a precise characterization of equilibrium. The KL-regularized RL objective admits an almost term-by-term version of the same structure.
-
-This post works out that dictionary explicitly: reward as negative energy, $$\beta$$ as temperature, KL divergence as relative entropy, and the RL objective as a free-energy principle. Then I ask the question the analogy naturally suggests: **if the theory predicts a unique Gibbs optimum $$\pi_\beta^\ast$$, how close does actual training get to it?** I test this with a GRPO-family trainer on GSM8K.
+This post works out that dictionary explicitly: reward as negative energy, $\beta$ as temperature, KL divergence as relative entropy, and the RL objective as a free-energy principle in eq. (4). Then I ask the question the analogy naturally suggests: **if the theory predicts a unique Gibbs optimum $\pi_\beta^\ast$ in eq. (1), how close does actual training get to it?** I test this with a GRPO-family trainer[^grpo] on GSM8K.
 
 
 ## The KL-regularized objective
 
-Equation (3) in [Rafailov et al. (2023), *Direct Preference Optimization: Your Language Model Is Secretly a Reward Model*](https://proceedings.neurips.cc/paper_files/paper/2023/file/a85b405ed65c6477a4fe8302b5e06ce7-Paper-Conference.pdf) defines the KL-regularized RLHF objective that underlies DPO. The same reward–KL tradeoff appears in PPO and GRPO; those methods optimize surrogates or sample-based estimators plus a KL divergence term for regularization with respect to reference policy. In general, for a fixed prompt $$x$$, the goal is to optimize
+Equation (3) in Rafailov et al. (2023)[^dpo] defines the KL-regularized RLHF objective that underlies DPO. The same reward–KL tradeoff appears in PPO and GRPO; those methods optimize surrogates or sample-based estimators plus a KL divergence term for regularization with respect to reference policy. In general, for a fixed prompt $x$, the goal is to optimize
 
-$$\max_{\pi} \; \mathbb{E}_{y\sim\pi(\cdot\mid x)} \left[ r(x,y) \right] - \beta D_{\mathrm{KL}} \left( \pi(\cdot\mid x) \;\|\; \pi_{\mathrm{ref}}(\cdot\mid x) \right).$$
+$$
+\max_{\pi} \; \mathbb{E}_{y\sim\pi(\cdot\mid x)} \left[ r(x,y) \right] - \beta D_{\mathrm{KL}} \left( \pi(\cdot\mid x) \;\|\; \pi_{\mathrm{ref}}(\cdot\mid x) \right).
+\tag{2}\label{eq:kl-max-objective}
+$$
 
-For readability, we suppress the conditioning on $$x$$ and write $$\pi(y)\equiv\pi(y\mid x)$$, $$\pi_{\mathrm{ref}}(y)\equiv\pi_{\mathrm{ref}}(y\mid x)$$, and $$r(y)\equiv r(x,y)$$. The objective becomes
+For readability, we suppress the conditioning on $x$ and write $\pi(y)\equiv\pi(y\mid x)$, $\pi_{\mathrm{ref}}(y)\equiv\pi_{\mathrm{ref}}(y\mid x)$, and $r(y)\equiv r(x,y)$. The objective becomes
 
-$$J[\pi] = \mathbb{E}_{y\sim\pi}[r(y)] - \beta D_{\mathrm{KL}} \left( \pi \;\|\; \pi_{\mathrm{ref}} \right).$$
+$$
+J[\pi] = \mathbb{E}_{y\sim\pi}[r(y)] - \beta D_{\mathrm{KL}} \left( \pi \;\|\; \pi_{\mathrm{ref}} \right).
+\tag{3}\label{eq:kl-j-objective}
+$$
 
-Maximizing $$J[\pi]$$ is equivalent to minimizing
+Maximizing $J[\pi]$ is equivalent to minimizing
 
-$$\boxed{ \mathcal{F}_{\beta}[\pi] = - \mathbb{E}_{y\sim\pi}[r(y)] + \beta D_{\mathrm{KL}} \left( \pi \;\|\; \pi_{\mathrm{ref}} \right). }\tag{1}\label{eq:dpo-free-energy}$$
+$$
+\boxed{ \mathcal{F}_{\beta}[\pi] = - \mathbb{E}_{y\sim\pi}[r(y)] + \beta D_{\mathrm{KL}} \left( \pi \;\|\; \pi_{\mathrm{ref}} \right). }
+\tag{4}\label{eq:dpo-free-energy}
+$$
 
-Here $$\mathcal{F}_{\beta}$$ is a functional of the policy $$\pi$$. Given a reference policy $$\pi_{\mathrm{ref}}$$ and reward function $$r$$, the problem is to find the policy $$\pi$$ that minimizes $$\mathcal{F}_{\beta}$$.
+Here $\mathcal{F}_{\beta}$ is a functional of the policy $\pi$. Given a reference policy $\pi_{\mathrm{ref}}$ and reward function $r$, the problem is to find the policy $\pi$ that minimizes eq. (4).
 
 ## Mapping to statistical mechanics
 
-The objective above has the form of a [Helmholtz free energy](https://en.wikipedia.org/wiki/Helmholtz_free_energy). Each response $$y$$ is a state of the system, with energy
+The objective in eq. (4) has the form of a [Helmholtz free energy](https://en.wikipedia.org/wiki/Helmholtz_free_energy). Each response $y$ is a state of the system, with energy
 
-$$\epsilon(y)=-r(y).$$
+$$
+\epsilon(y)=-r(y).
+\tag{5}\label{eq:energy}
+$$
 
-For a policy $$\pi$$, define the mean energy and dimensionless relative entropy as
+For a policy $\pi$, define the mean energy and dimensionless relative entropy as
 
-$$U[\pi]=\mathbb{E}_{\pi}[\epsilon]=-\mathbb{E}_{\pi}[r],
+$$
+U[\pi]=\mathbb{E}_{\pi}[\epsilon]=-\mathbb{E}_{\pi}[r],
 \qquad
-S_{\mathrm{rel}}[\pi]=-D_{\mathrm{KL}}(\pi\|\pi_{\mathrm{ref}}).$$
+S_{\mathrm{rel}}[\pi]=-D_{\mathrm{KL}}(\pi\|\pi_{\mathrm{ref}}).
+\tag{6}\label{eq:internal-energy-entropy}
+$$
 
 This objective is therefore
 
-$$\mathcal{F}_{\beta}[\pi]
-=U[\pi]-\beta S_{\mathrm{rel}}[\pi],$$
+$$
+\mathcal{F}_{\beta}[\pi]
+=U[\pi]-\beta S_{\mathrm{rel}}[\pi],
+\tag{7}\label{eq:helmholtz-form}
+$$
 
-which matches $$F=U-TS$$ term by term:
+which matches $F=U-TS$ term by term:
 
-$$\boxed{
+$$
+\boxed{
 \epsilon(y)\longleftrightarrow-r(y),\qquad
 k_B T\longleftrightarrow\beta,\qquad
 \frac{S}{k_B}\longleftrightarrow-D_{\mathrm{KL}}(\pi\|\pi_{\mathrm{ref}}).
-}\tag{2}\label{eq:dictionary-correspondence}$$
+}
+\tag{8}\label{eq:dictionary-correspondence}
+$$
 
-Here DPO's $$\beta$$ plays the role of thermal energy $$k_B T$$, so its Boltzmann factor $$e^{-\epsilon/\beta}$$ matches $$e^{-\beta_{\mathrm{phys}}\epsilon}$$ under the physics convention $$\beta_{\mathrm{phys}}=1/(k_B T)$$.
+Here DPO's $\beta$ plays the role of thermal energy $k_B T$, so its Boltzmann factor $e^{-\epsilon/\beta}$ matches $e^{-\beta_{\mathrm{phys}}\epsilon}$ under the physics convention $\beta_{\mathrm{phys}}=1/(k_B T)$.
 
-But shouldn't [entropy](https://en.wikipedia.org/wiki/Entropy_(statistical_thermodynamics)#Gibbs_entropy_formula) be $$-\sum_{i}\pi_i\log{\pi_i}$$? Why does it involve a reference distribution, $$-\sum_{i}\pi_i\log{\pi_i/\pi_{\mathrm{ref},i}}$$? Ordinary entropy takes exactly this form when states have [degeneracies](https://en.wikipedia.org/wiki/Degenerate_energy_levels). Suppose coarse-grained state $$i$$ contains $$g_i$$ microstates and has total probability $$\pi_i$$. If those microstates are equally likely, each has probability $$p_{i,\alpha}=\pi_i/g_i$$, so
+But shouldn't [entropy](https://en.wikipedia.org/wiki/Entropy_(statistical_thermodynamics)#Gibbs_entropy_formula) be $-\sum_{i}\pi_i\log{\pi_i}$? Why does it involve a reference distribution, $-\sum_{i}\pi_i\log{\pi_i/\pi_{\mathrm{ref},i}}$? Ordinary entropy takes exactly this form when states have [degeneracies](https://en.wikipedia.org/wiki/Degenerate_energy_levels). Suppose coarse-grained state $i$ contains $g_i$ microstates and has total probability $\pi_i$. If those microstates are equally likely, each has probability $p_{i,\alpha}=\pi_i/g_i$, so
 
 $$
 \frac{S}{k_B}
@@ -82,9 +102,10 @@ $$
 = -\sum_i \pi_i \log\pi_i + \sum_i \pi_i \log g_i
 = -\sum_i \pi_i \log\frac{\pi_i}{q_i} + \log G
 = -D_{\mathrm{KL}}(\pi\|q)+\log G.
-\tag{3}\label{eq:entropy-kl-decomposition}$$
+\tag{9}\label{eq:entropy-kl-decomposition}
+$$
 
-The constant $$\log G$$ does not affect minimization of the free energy. Thus, up to an additive constant, degeneracy turns ordinary entropy into negative KL divergence relative to the normalized degeneracy measure $$q$$.
+The constant $\log G$ does not affect minimization of the free energy in eq. (4). Thus, up to an additive constant, degeneracy turns ordinary entropy into negative KL divergence relative to the normalized degeneracy measure $q$.
 
 Minimizing $$F=U-TS/k_B=\sum_i\pi_i\epsilon_i+\beta D_{\mathrm{KL}}(\pi\|q)$$ subject to $$\sum_i\pi_i=1$$ (the same variational problem as in [Appendix B](#b-lagrange-multiplier), with $$\pi_{\mathrm{ref}}$$ replaced by $$q$$) gives the Boltzmann distribution
 
@@ -92,39 +113,47 @@ $$
 \pi_i = \frac{g_i \exp(-\beta_{\mathrm{phys}} \epsilon_i)}{Z},
 \qquad
 Z = \sum_{i} g_i \exp(-\beta_{\mathrm{phys}} \epsilon_i).
-\tag{4}\label{eq:degenerate-boltzmann-distribution}$$
+\tag{10}\label{eq:degenerate-boltzmann-distribution}
+$$
 
 This is the standard form for degenerate systems; see [Ellgen, *Thermodynamics and Chemical Equilibrium*, §21.1](https://chem.libretexts.org/Bookshelves/Physical_and_Theoretical_Chemistry_Textbook_Maps/Thermodynamics_and_Chemical_Equilibrium_(Ellgen)/21%3A_The_Boltzmann_Distribution_Function/21.01%3A_Finding_the_Boltzmann_Equation) and [Pathria and Beale, *Statistical Mechanics*, §3.4](https://shop.elsevier.com/books/statistical-mechanics/beale/978-0-12-382188-1).
 
-In KL-regularized RL, $$\pi_{\mathrm{ref}}(y)$$ is the normalized degeneracy measure $$q(y)$$. With $$\epsilon(y)=-r(y)$$ and DPO's $$\beta$$ corresponding to thermal energy $$k_B T$$ (so $$\beta_{\mathrm{phys}}=1/\beta$$),
+In KL-regularized RL, $\pi_{\mathrm{ref}}(y)$ is the normalized degeneracy measure $q(y)$. With $\epsilon(y)=-r(y)$ from eq. (5) and DPO's $\beta$ corresponding to thermal energy $k_B T$ (so $\beta_{\mathrm{phys}}=1/\beta$),
 
-$$e^{-\beta_{\mathrm{phys}}\epsilon}=e^{r/\beta},$$
+$$
+e^{-\beta_{\mathrm{phys}}\epsilon}=e^{r/\beta},
+\tag{11}\label{eq:boltzmann-weight}
+$$
 
-which is the Boltzmann weight in eq. (7).
+which is the Boltzmann weight appearing in eq. (1).
 
 
 ## The Gibbs optimum
 
-In statistical mechanics, for fixed temperature, energy levels, and normalized degeneracy measure $$q$$, the Gibbs distribution uniquely minimizes the free energy. The same variational principle holds here: once $$\beta$$, the reward function, and the reference policy $$\pi_{\mathrm{ref}}$$ are fixed, there is a unique optimal policy that minimizes $$\mathcal{F}_{\beta}$$. In a physical system, $$q$$ is fixed by degeneracies; in preference optimization, $$\pi_{\mathrm{ref}}$$ is a modeling choice that may vary across setups, but within any one setup it serves as the fixed reference.
+In statistical mechanics, for fixed temperature, energy levels, and normalized degeneracy measure $q$, the Gibbs distribution uniquely minimizes the free energy. The same variational principle holds here: once $\beta$, the reward function, and the reference policy $\pi_{\mathrm{ref}}$ are fixed, there is a unique optimal policy that minimizes $\mathcal{F}_{\beta}$ in eq. (4). In a physical system, $q$ is fixed by degeneracies; in preference optimization, $\pi_{\mathrm{ref}}$ is a modeling choice that may vary across setups, but within any one setup it serves as the fixed reference.
 
 Following the steps in the [appendix](#appendix-two-derivations-of-the-optimal-policy), the free energy decomposes as
 
-$$\boxed{ \mathcal{F}_{\beta}[\pi] = -\beta\log Z_{\beta} + \beta D_{\mathrm{KL}} \left( \pi \;\|\; \pi_{\beta}^{\ast} \right). }\tag{5}\label{eq:free-energy-gap}$$
+$$
+\boxed{ \mathcal{F}_{\beta}[\pi] = -\beta\log Z_{\beta} + \beta D_{\mathrm{KL}} \left( \pi \;\|\; \pi_{\beta}^{\ast} \right). }
+\tag{12}\label{eq:free-energy-gap}
+$$
 
 where the partition function is
 
-$$\boxed{ Z_{\beta} = \sum_y \pi_{\mathrm{ref}}(y) e^{r(y)/\beta} }\tag{6}\label{eq:dpo-partition-function}$$
+$$
+\boxed{ Z_{\beta} = \sum_y \pi_{\mathrm{ref}}(y) e^{r(y)/\beta} }
+\tag{13}\label{eq:dpo-partition-function}
+$$
 
-and the corresponding Gibbs policy is
+and the corresponding Gibbs policy is eq. (1), with $Z(x)$ replaced by $Z_{\beta}$ when conditioning on $x$ is suppressed.
 
-$$\boxed{ \pi_{\beta}^{\ast}(y) = \frac{ \pi_{\mathrm{ref}}(y) e^{r(y)/\beta} }{ Z_{\beta} }. }\tag{7}\label{eq:optimal-gibbs-policy}$$
+Since $D_{\mathrm{KL}}(\pi\|\pi_{\beta}^{\ast})\ge 0$, with equality if and only if $\pi=\pi_{\beta}^{\ast}$, the unique minimizer is $\pi_{\beta}^{\ast}$ and the equilibrium free energy is $\mathcal{F}_{\beta}^{\ast}=-\beta\log Z_{\beta}$. This is exactly the free energy of a [canonical ensemble](https://en.wikipedia.org/wiki/Helmholtz_free_energy#Relation_to_the_canonical_partition_function). More generally, once the [partition function](https://en.wikipedia.org/wiki/Partition_function_(statistical_mechanics)#Relation_to_thermodynamic_variables) in eq. (13) is known, equilibrium quantities such as internal energy, entropy, and heat capacity follow from it and its derivatives with respect to $\beta$—the same logic summarized in the dictionary below and in eq. (8).
 
-Since $$D_{\mathrm{KL}}(\pi\|\pi_{\beta}^{\ast})\ge 0$$, with equality if and only if $$\pi=\pi_{\beta}^{\ast}$$, the unique minimizer is $$\pi_{\beta}^{\ast}$$ and the equilibrium free energy is $$\mathcal{F}_{\beta}^{\ast}=-\beta\log Z_{\beta}$$. This is exactly the free energy of a [canonical ensemble](https://en.wikipedia.org/wiki/Helmholtz_free_energy#Relation_to_the_canonical_partition_function). More generally, once the [partition function](https://en.wikipedia.org/wiki/Partition_function_(statistical_mechanics)#Relation_to_thermodynamic_variables) is known, equilibrium quantities such as internal energy, entropy, and heat capacity follow from it and its derivatives with respect to $$\beta$$—the same logic summarized in the dictionary below.
+There are two standard ways to derive $\pi_{\beta}^{\ast}$:
 
-There are two standard ways to derive $$\pi_{\beta}^{\ast}$$:
-
-1. **Partition-function / KL decomposition.** Rewrite $$\mathcal{F}_{\beta}[\pi]$$ so that an unnormalized Boltzmann weight appears, then normalize it by $$Z_{\beta}$$.
-2. **Lagrange multiplier.** Enforce the normalization constraint $$\sum_y\pi(y)=1$$ while setting the functional derivative of $$\mathcal{F}_{\beta}$$ to zero; the stationary point is again the same policy.
+1. **Partition-function / KL decomposition.** Rewrite eq. (4) so that an unnormalized Boltzmann weight appears, then normalize it by $Z_{\beta}$ from eq. (13).
+2. **Lagrange multiplier.** Enforce the normalization constraint $\sum_y\pi(y)=1$ while setting the functional derivative of $\mathcal{F}_{\beta}$ to zero; the stationary point is again eq. (1).
 
 Full algebra for both routes is in the [appendix](#appendix-two-derivations-of-the-optimal-policy).
 
@@ -144,7 +173,7 @@ Statistical mechanics on the left, KL-regularized RL on the right:
 | Free-energy gap                  | $$\beta\, D_{\mathrm{KL}}(\pi \Vert \pi_\beta^{\ast})$$                                                                                   |
 | Heat capacity $$C_V/k_B$$        | $$\displaystyle \frac{\operatorname{Var}_{\pi_{\beta}^{\ast}}[r]}{\beta^2} = -\frac{\partial \mathbb{E}_{\pi_{\beta}^{\ast}}[r]}{\partial \beta}$$ |
 
-The heat-capacity entry follows from differentiating the partition function. Write $$t=1/\beta$$ so that $$Z_{\beta}=\sum_y\pi_{\mathrm{ref}}(y)e^{tr(y)}$$. Standard identities for the Gibbs policy give $$\mathbb{E}_{\pi_{\beta}^{\ast}}[r]=\partial_t\log Z_{\beta}$$ and $$\operatorname{Var}_{\pi_{\beta}^{\ast}}[r]=\partial_t^2\log Z_{\beta}$$. Since $$t=1/\beta$$ implies $$\mathrm{d}t/\mathrm{d}\beta=-1/\beta^2$$,
+The heat-capacity entry follows from differentiating the partition function in eq. (13). Write $t=1/\beta$ so that $Z_{\beta}=\sum_y\pi_{\mathrm{ref}}(y)e^{tr(y)}$. Standard identities for the Gibbs policy in eq. (1) give $\mathbb{E}_{\pi_{\beta}^{\ast}}[r]=\partial_t\log Z_{\beta}$ and $\operatorname{Var}_{\pi_{\beta}^{\ast}}[r]=\partial_t^2\log Z_{\beta}$. Since $t=1/\beta$ implies $\mathrm{d}t/\mathrm{d}\beta=-1/\beta^2$,
 
 $$-\frac{\partial \mathbb{E}_{\pi_{\beta}^{\ast}}[r]}{\partial \beta}
 = -\frac{\mathrm{d}t}{\mathrm{d}\beta}\,\frac{\partial \mathbb{E}_{\pi_{\beta}^{\ast}}[r]}{\partial t}
@@ -160,7 +189,7 @@ Everything above is exact at the level of probability distributions. To see what
 
 For each of 64 GSM8K test prompts $$x_i$$, I sampled 24 candidate responses $$y_{ij}$$ from the base model, giving 1,536 completions in total. Generation used temperature 0.8, top-p 0.95, and a 512-token limit. Each candidate has a base-model log-probability and a binary correctness reward $$r(x_i,y_{ij})\in\{0,1\}$$. Normalizing the base-model probabilities over the 24 candidates defines $$\pi_{\mathrm{ref}}(y_{ij}\mid x_i)$$ on this finite candidate set.
 
-Treating these 24 candidates as the state space turns every expectation into a finite sum. For each prompt,
+Treating these 24 candidates as the state space turns every expectation into a finite sum. For each prompt, eqs. (1) and (13) become
 
 $$
 Z_{\beta}(x_i)
@@ -170,9 +199,10 @@ e^{r(x_i,y_{ij})/\beta},
 \pi_{\beta}^{\ast}(y_{ij}\mid x_i)
 =\frac{\pi_{\mathrm{ref}}(y_{ij}\mid x_i)e^{r(x_i,y_{ij})/\beta}}
 {Z_{\beta}(x_i)}.
+\tag{14}\label{eq:finite-gibbs}
 $$
 
-Once the candidate set has been sampled, the Gibbs policy and its expected reward, KL divergence, and free energy can all be evaluated exactly on that set. Sweeping $$\beta$$ traces the optimal reward–KL frontier in [Figure 1](#figure-reward-kl-frontier) and the corresponding free-energy landscape in [Figure 2](#figure-free-energy-landscape). Figure 1 also compares two ways of defining the reference weights: full-sequence probability and length-normalized probability. The remaining experiments use full-sequence probability.
+Once the candidate set has been sampled, the Gibbs policy and its expected reward, KL divergence, and free energy from eq. (4) can all be evaluated exactly on that set. Sweeping $\beta$ traces the optimal reward–KL frontier in [Figure 1](#figure-reward-kl-frontier) and the corresponding free-energy landscape in [Figure 2](#figure-free-energy-landscape). Figure 1 also compares two ways of defining the reference weights: full-sequence probability and length-normalized probability. The remaining experiments use full-sequence probability.
 
 <figure id="figure-reward-kl-frontier">
   <img src="{{ '/assets/figures/a-physicists-dictionary-for-dpo/reward-kl-frontier.png' | relative_url }}" alt="Reward–KL frontier across beta values">
@@ -188,9 +218,9 @@ Once the candidate set has been sampled, the Gibbs policy and its expected rewar
 
 ### GRPO-family training vs. the floor
 
-At the reference policy the KL term is zero, so $$\mathcal{F}_{\beta}[\pi_{\mathrm{ref}}]=-\mathbb{E}_{\pi_{\mathrm{ref}}}[r]$$, shown as the black dotted baseline in [Figure 2](#figure-free-energy-landscape). If training reaches the distribution-level optimum, its free energy should fall from this baseline toward the red Gibbs minimum.
+At the reference policy the KL term is zero, so $\mathcal{F}_{\beta}[\pi_{\mathrm{ref}}]=-\mathbb{E}_{\pi_{\mathrm{ref}}}[r]$, shown as the black dotted baseline in [Figure 2](#figure-free-energy-landscape). If training reaches the distribution-level optimum, its free energy should fall from this baseline toward the red Gibbs minimum at $\mathcal{F}_{\beta}^{\ast}=-\beta\log Z_{\beta}$ from eq. (12).
 
-To test this, I ran a GRPO-family trainer separately for $$\beta\in\{0.01,0.02,0.05,0.1,0.2\}$$, using group size $$G=32$$, 6,500 GSM8K training prompts, for about one epoch (262,144 rollouts). I saved checkpoints every 32,768 rollouts and evaluated each checkpoint on the same 500 held-out prompts. The reference model starts at an expected reward of 0.348.
+To test this, I ran a GRPO-family trainer[^grpo] separately for $\beta\in\{0.01,0.02,0.05,0.1,0.2\}$, using group size $G=32$, 6,500 GSM8K training prompts, for about one epoch (262,144 rollouts). I saved checkpoints every 32,768 rollouts and evaluated each checkpoint on the same 500 held-out prompts. The reference model starts at an expected reward of 0.348.
 
 <figure id="figure-training-free-energy-decomposition">
   <img src="{{ '/assets/figures/a-physicists-dictionary-for-dpo/training-free-energy-decomposition.png' | relative_url }}" alt="Training-time free-energy decomposition across KL penalty values">
@@ -199,7 +229,7 @@ To test this, I ran a GRPO-family trainer separately for $$\beta\in\{0.01,0.02,0
 
 ### Why training falls short
 
-I expected each policy to move toward its $$\pi_{\beta}^{\ast}$$ and each free-energy curve to approach its dashed target. [Figure 3](#figure-training-free-energy-decomposition) shows that this was too optimistic: after one epoch, none of the runs reached its Gibbs minimum. Reward improved, but not enough to offset the accompanying $$\beta$$-weighted KL cost, so the measured free energy stayed above the target.
+I expected each policy to move toward its $\pi_{\beta}^{\ast}$ from eq. (1) and each free-energy curve to approach its dashed target from eq. (12). [Figure 3](#figure-training-free-energy-decomposition) shows that this was too optimistic: after one epoch, none of the runs reached its Gibbs minimum. Reward improved, but not enough to offset the accompanying $\beta$-weighted KL cost, so the measured free energy stayed above the target.
 
 Likely explanations:
 
@@ -208,83 +238,106 @@ Likely explanations:
 
 ## Takeaways
 
-- KL-regularized RL is free-energy minimization in statistical physics.
-  - Given $$\beta$$, reference policy $$\pi_{\mathrm{ref}}$$, and reward function $$r$$, there is a unique policy $$\pi_{\beta}^{\ast}$$ that minimizes the free energy.
-  - From $$Z_\beta$$ we can read off internal energy, entropy, temperature, free energy, and heat capacity.
+- KL-regularized RL is free-energy minimization in statistical physics: eq. (4) is the RL free energy and eq. (8) is the dictionary.
+  - Given $\beta$, reference policy $\pi_{\mathrm{ref}}$, and reward function $r$, there is a unique policy $\pi_{\beta}^{\ast}$ in eq. (1) that minimizes the free energy.
+  - From $Z_{\beta}$ in eq. (13) we can read off internal energy, entropy, temperature, free energy, and heat capacity.
 - Training may not reach that distribution-level optimum.
 
 Code and full experiments: [github.com/wang-zhongwei/stat-mech-dpo](https://github.com/wang-zhongwei/stat-mech-dpo)
 
 ## Appendix: two derivations of the optimal policy
 
-Both routes start from the free-energy functional
+Both routes start from eq. (4), equivalently written as
 
-$$\boxed{\mathcal{F}_{\beta}[\pi] = -\sum_y \pi(y)r(y) + \beta\sum_y\pi(y)\log\frac{\pi(y)}{\pi_{\mathrm{ref}}(y)}}$$
+$$
+\boxed{\mathcal{F}_{\beta}[\pi] = -\sum_y \pi(y)r(y) + \beta\sum_y\pi(y)\log\frac{\pi(y)}{\pi_{\mathrm{ref}}(y)}}
+\tag{A.0}\label{eq:appendix-free-energy-sum}
+$$
 
-and the normalization constraint $$\sum_y\pi(y)=1$$. They recover the same partition function, optimal policy, and free-energy minimum.
+and the normalization constraint $\sum_y\pi(y)=1$. They recover the partition function in eq. (13), the optimal policy in eq. (1), and the free-energy minimum in eq. (12).
 
 ### A. Partition-function / KL decomposition
 
-Writing the expectation and KL divergence explicitly and dividing by $$\beta$$ gives
+Writing the expectation and KL divergence explicitly and dividing by $\beta$ gives
 
-$$\frac{\mathcal{F}_{\beta}[\pi]}{\beta}
+$$
+\frac{\mathcal{F}_{\beta}[\pi]}{\beta}
 = \sum_y \pi(y)\left[\log\frac{\pi(y)}{\pi_{\mathrm{ref}}(y)}-\frac{r(y)}{\beta}\right]
-= \sum_y \pi(y)\log\frac{\pi(y)}{\pi_{\mathrm{ref}}(y)e^{r(y)/\beta}}.\tag{A.1}\label{eq:appendix-kl-rewrite}$$
+= \sum_y \pi(y)\log\frac{\pi(y)}{\pi_{\mathrm{ref}}(y)e^{r(y)/\beta}}.
+\tag{A.1}\label{eq:appendix-kl-rewrite}
+$$
 
-The Boltzmann weight $$\pi_{\mathrm{ref}}(y)e^{r(y)/\beta}$$ appears directly from the objective—not as an ansatz. Normalizing it by the partition function
+The Boltzmann weight $\pi_{\mathrm{ref}}(y)e^{r(y)/\beta}$ from eq. (11) appears directly from the objective—not as an ansatz. Normalizing it by the partition function in eq. (13) gives the optimal policy in eq. (1).
 
-$$Z_{\beta} = \sum_y \pi_{\mathrm{ref}}(y) e^{r(y)/\beta}$$
+Substituting $\pi_{\mathrm{ref}}(y)e^{r(y)/\beta}=Z_{\beta}\pi_{\beta}^{\ast}(y)$ then yields
 
-to obtain the optimal policy
-
-$$\pi_{\beta}^{\ast}(y) = \frac{\pi_{\mathrm{ref}}(y)e^{r(y)/\beta}}{Z_{\beta}}.$$
-
-Substituting $$\pi_{\mathrm{ref}}(y)e^{r(y)/\beta}=Z_{\beta}\pi_{\beta}^{\ast}(y)$$ then yields
-
-$$\frac{\mathcal{F}_{\beta}[\pi]}{\beta}
+$$
+\frac{\mathcal{F}_{\beta}[\pi]}{\beta}
 = \sum_y \pi(y)\log\frac{\pi(y)}{Z_{\beta}\pi_{\beta}^{\ast}(y)}
 = D_{\mathrm{KL}}\left(\pi\;\|\;\pi_{\beta}^{\ast}\right)
-- \log Z_{\beta}\sum_y\pi(y).\tag{A.2}\label{eq:appendix-kl-expansion}$$
+- \log Z_{\beta}\sum_y\pi(y).
+\tag{A.2}\label{eq:appendix-kl-expansion}
+$$
 
-Because $$\pi$$ is a normalized probability distribution, $$\sum_y\pi(y)=1$$. Multiplying by $$\beta$$ therefore gives
+Because $\pi$ is a normalized probability distribution, $\sum_y\pi(y)=1$. Multiplying by $\beta$ therefore gives eq. (12):
 
-$$\mathcal{F}_{\beta}[\pi] = -\beta\log Z_{\beta} + \beta D_{\mathrm{KL}}\left(\pi\;\|\;\pi_{\beta}^{\ast}\right).\tag{A.3}\label{eq:appendix-free-energy-decomposition}$$
+$$
+\mathcal{F}_{\beta}[\pi] = -\beta\log Z_{\beta} + \beta D_{\mathrm{KL}}\left(\pi\;\|\;\pi_{\beta}^{\ast}\right).
+\tag{A.3}\label{eq:appendix-free-energy-decomposition}
+$$
 
-Since $$D_{\mathrm{KL}}(\pi\|\pi_{\beta}^{\ast})\ge 0$$, with equality if and only if $$\pi=\pi_{\beta}^{\ast}$$, the unique minimizer is $$\pi_{\beta}^{\ast}$$ and $$\mathcal{F}_{\beta}^{\ast}=-\beta\log Z_{\beta}$$.
+Since $D_{\mathrm{KL}}(\pi\|\pi_{\beta}^{\ast})\ge 0$, with equality if and only if $\pi=\pi_{\beta}^{\ast}$, the unique minimizer is eq. (1) and $\mathcal{F}_{\beta}^{\ast}=-\beta\log Z_{\beta}$.
 
-With $$\epsilon=-r$$, the same algebra produces the statistical-mechanics form
+With $\epsilon=-r$ from eq. (5), the same algebra produces the statistical-mechanics form
 
-$$\pi_{\beta}^{\ast}(y)=\frac{\pi_{\mathrm{ref}}(y)e^{-\epsilon(y)/\beta}}{Z_{\beta}},\qquad Z_{\beta}=\sum_y\pi_{\mathrm{ref}}(y)e^{-\epsilon(y)/\beta}.$$
+$$
+\pi_{\beta}^{\ast}(y)=\frac{\pi_{\mathrm{ref}}(y)e^{-\epsilon(y)/\beta}}{Z_{\beta}},\qquad Z_{\beta}=\sum_y\pi_{\mathrm{ref}}(y)e^{-\epsilon(y)/\beta}.
+\tag{A.4}\label{eq:appendix-gibbs-energy-form}
+$$
 
-For a uniform $$\pi_{\mathrm{ref}}$$, this reduces to the canonical Gibbs distribution $$e^{-\epsilon/\beta}/Z_{\beta}$$.
+For a uniform $\pi_{\mathrm{ref}}$, this reduces to the canonical Gibbs distribution $e^{-\epsilon/\beta}/Z_{\beta}$.
 
 ### B. Lagrange multiplier
 
-To minimize $$\mathcal{F}_{\beta}[\pi]$$ subject to $$\sum_y\pi(y)=1$$, introduce a Lagrange multiplier $$\lambda$$:
+To minimize eq. (4) subject to $\sum_y\pi(y)=1$, introduce a Lagrange multiplier $\lambda$:
 
-$$\mathcal{L}[\pi,\lambda]
+$$
+\mathcal{L}[\pi,\lambda]
 = -\sum_y\pi(y)r(y)
 +\beta\sum_y\pi(y)\log\frac{\pi(y)}{\pi_{\mathrm{ref}}(y)}
-+\lambda\left(\sum_y\pi(y)-1\right).\tag{B.1}\label{eq:lagrangian}$$
++\lambda\left(\sum_y\pi(y)-1\right).
+\tag{B.1}\label{eq:lagrangian}
+$$
 
-Stationarity with respect to each $$\pi(y)$$ requires
+Stationarity with respect to each $\pi(y)$ requires
 
-$$\frac{\partial\mathcal{L}}{\partial\pi(y)}
+$$
+\frac{\partial\mathcal{L}}{\partial\pi(y)}
 = -r(y)
 +\beta\left(\log\frac{\pi(y)}{\pi_{\mathrm{ref}}(y)}+1\right)
 +\lambda
-=0.\tag{B.2}\label{eq:stationarity}$$
+=0.
+\tag{B.2}\label{eq:stationarity}
+$$
 
-Solving for $$\pi(y)$$ gives
+Solving for $\pi(y)$ gives
 
-$$\pi(y)=C\,\pi_{\mathrm{ref}}(y)e^{r(y)/\beta},\tag{B.3}\label{eq:unnormalized-policy}$$
+$$
+\pi(y)=C\,\pi_{\mathrm{ref}}(y)e^{r(y)/\beta},
+\tag{B.3}\label{eq:unnormalized-policy}
+$$
 
-where $$C=e^{-1-\lambda/\beta}$$ is independent of $$y$$. Enforcing normalization yields
+where $C=e^{-1-\lambda/\beta}$ is independent of $y$. Enforcing normalization yields $C^{-1}=Z_{\beta}$ from eq. (13), and therefore the same optimal policy as eq. (1):
 
-$$C^{-1}=\sum_y\pi_{\mathrm{ref}}(y)e^{r(y)/\beta}=Z_{\beta},$$
+$$
+\pi_{\beta}^{\ast}(y)=\frac{\pi_{\mathrm{ref}}(y)e^{r(y)/\beta}}{Z_{\beta}}.
+\tag{B.4}\label{eq:appendix-optimal-policy}
+$$
 
-and therefore the same optimal policy
+Substituting this stationary point back into eq. (4) recovers the equilibrium free energy $\mathcal{F}_{\beta}^{\ast}=-\beta\log Z_{\beta}$ from eq. (12).
 
-$$\pi_{\beta}^{\ast}(y)=\frac{\pi_{\mathrm{ref}}(y)e^{r(y)/\beta}}{Z_{\beta}}.\tag{B.4}\label{eq:appendix-optimal-policy}$$
+[^dpo]: Rafailov et al., [*Direct Preference Optimization: Your Language Model Is Secretly a Reward Model*](https://proceedings.neurips.cc/paper_files/paper/2023/file/a85b405ed65c6477a4fe8302b5e06ce7-Paper-Conference.pdf), NeurIPS 2023.
 
-Substituting this stationary point back into $$\mathcal{F}_{\beta}$$ recovers the equilibrium free energy $$\mathcal{F}_{\beta}^{\ast}=-\beta\log Z_{\beta}$$.
+[^ppo]: Schulman et al., [*Proximal Policy Optimization Algorithms*](https://arxiv.org/abs/1707.06347), arXiv:1707.06347 (2017). PPO does not optimize the KL-regularized objective in eq. (2) directly: it maximizes a clipped surrogate in the ratio $\rho=\pi_\theta/\pi_{\theta_{\mathrm{old}}}$. But at the start of each update, where $\pi_\theta=\pi_{\theta_{\mathrm{old}}}$, the clip is inactive and $\nabla_\theta\,\rho A=\nabla_\theta \log\pi_\theta\,A$—the vanilla policy gradient. With the KL-to-reference penalty folded into the reward, PPO therefore locally ascends the same KL-regularized objective; clipping only limits the step size.
+
+[^grpo]: Shao et al., [*DeepSeekMath: Pushing the Limits of Mathematical Reasoning in Open Language Models*](https://arxiv.org/abs/2402.03300), arXiv:2402.03300 (2024).

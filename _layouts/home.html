@@ -18,9 +18,7 @@ layout: default
   {%- if site.posts.size > 0 -%}
     {%- for post in site.posts -%}
     <article class="post-item">
-      <time class="post-date" datetime="{{ post.date | date_to_xmlschema }}">
-        {{ post.date | date: "%b %-d, %Y" }}
-      </time>
+      {% include post-meta.html item=post body=post.content date_format="%b %-d, %Y" %}
       <h2 class="post-item-title">
         <a href="{{ post.url | relative_url }}">{{ post.title | escape }}</a>
       </h2>

@@ -1,12 +1,12 @@
 ---
 layout: post
-title: "A mental model to understand RL policy optimizations"
-subtitle: "The diagram to unify PPO/GRPO, DAPO, GSPO, SAO, SAPO..."
+title: "A mental model to unify RL policy losses"
+subtitle: "The diagram to compare PPO/GRPO, DAPO, GSPO, SAO, SAPO..."
 date: 2026-08-14
 tags: [rl, ppo, grpo, gspo, dapo, sao, sapo]
 ---
 
-Inspired by the [Feynman technique](https://en.wikipedia.org/wiki/Learning_by_teaching), I'll try to explain some landmark policy optimization methods used in LLM RL as simply as I can from the very beginning of PPO to GRPO to GSPO and then some modern variations in the last 2 years DAPO SAO and SAPO. Writing them out helps me understand them better, and hopefully it helps you too.
+Inspired by the [Feynman technique](https://en.wikipedia.org/wiki/Learning_by_teaching), I'll explain landmark policy optimization methods used in LLM RL as simply as I can—starting with PPO[^ppo] and GRPO[^grpo], then recent variants DAPO[^dapo], GSPO[^gspo], SAO[^sao], and SAPO[^sapo]. Writing them out helps me understand them better, and hopefully it helps you too.
 
 > 💡 **New to PPO or GRPO?** These introductions are good places to start before reading this blog: [PPO](https://huggingface.co/blog/deep-rl-ppo) and [GRPO](https://huggingface.co/blog/garg-aayush/derive-grpo-loss).
 
@@ -14,9 +14,10 @@ Policy objectives in LLM RL usually involve importance ratio. Define the token-l
 
 $$
 \rho_t = \frac{\pi_{\theta}(y_t \mid x, y_{<t})}{\pi_{\text{old}}(y_t \mid x, y_{<t})},
+\tag{1}\label{eq:importance-ratio}
 $$
 
-which compares the probability assigned to token $y_t$ by the current policy, $\pi_\theta$, with that assigned by the old policy, $\pi_{\text{old}}$. The full [PPO objective](https://arxiv.org/abs/1707.06347) is
+where $\pi_\theta$ is the current policy and $\pi_{\text{old}}$ is the old policy. The old policy could be the snapshot of the model weights at the beginning of the gradient update, as in PPO, or the rollout policy in asynchronous training such as SAO[^sao], lagged by more than one gradient update. The full PPO objective[^ppo] is
 
 $$
 J(\theta)
@@ -29,19 +30,21 @@ J(\theta)
 \operatorname{clip}(\rho_t, 1-\epsilon, 1+\epsilon)A_t
 \right)
 \right].
+\tag{2}\label{eq:ppo-full}
 $$
 
-To make it simpler, we can just consider the token level objective since the whole objective is just the expectation over . If it's GRPO there is gonna be another average over the group rollout dimensions. 
+To make it simpler, we can consider the token-level objective alone, since the full objective is an expectation of it over trajectories.
 
 $$
 J_t(\theta) = \min\left(
 \rho_t A_t,\;
 \operatorname{clip}(\rho_t, 1-\epsilon, 1+\epsilon)A_t
-\right)
+\right).
+\tag{3}\label{eq:ppo-token}
 $$
 
 
-The `min` and `clip` operations are where most writeups bury readers in notation. Split the objective by the sign of $A_t$, then by where $\rho_t$ sits relative to the clip bounds, and the logic becomes straightforward.
+The `min` and `clip` operations in eq. (3) are where most writeups bury readers in notation. Split the objective by the sign of $A_t$, then by where $\rho_t$ sits relative to the clip bounds, and the logic becomes straightforward.
 
 ### Case $A_t > 0$
 
@@ -113,6 +116,8 @@ J_t(\theta) = \rho_t A_t,
 \frac{\partial J_t}{\partial \rho_t}=A_t < 0
 $$
 
+Decreasing $\rho_t$ increases $J_t$, as it should for a negative advantage.
+
 **Clipped region ($\rho_t < 1-\epsilon$).**
 
 $$
@@ -121,23 +126,26 @@ J_t(\theta) = (1 - \epsilon) A_t,
 \frac{\partial J_t}{\partial \rho_t}= 0
 $$
 
-[Figure 1](#figure-ppo-clip-schematic) summarizes this behavior. On the $\log\rho_t$ vs. $A_t$ plane, there are four regions where a sampled token could fall into: In the red region, PPO/GRPO encourages the token by increasing its probability; in the blue region, it discourages the token; in the remaining regions, the token is effectively dropped. 
+Once the policy has already moved far enough against this token, further decreases are clipped out.
+
+[Figure 1](#figure-ppo-clip-schematic) summarizes this behavior. On the $\log\rho_t$ vs. $A_t$ plane, a sampled token falls into one of four regions: in the red region, PPO/GRPO encourages the token by increasing its probability; in the blue region, it discourages the token; in the remaining regions, the gradient on $\rho_t$ is zero, so the token is effectively dropped from the parameter update.
 
 <figure id="figure-ppo-clip-schematic">
   <img src="{{ '/assets/figures/mental-model-policy-optimizations/ppo-clip-schematic.png' | relative_url }}" alt="PPO clip schematic on the advantage–log-ratio plane">
-  <figcaption><strong>Figure 1.</strong> Schematic diagram for PPO/GRPO on the $\log{\rho_t}-A_t$ plane. Red is where we increase $\rho_t$, blue is where we decrease it, the rest are clipped out. Log ratio is used to make y-axis expand to infinities. The default $\epsilon = 0.2$ is used. </figcaption>
+  <figcaption><strong>Figure 1.</strong> Schematic diagram for PPO/GRPO on the $\log{\rho_t}-A_t$ plane. Red is where we increase $\rho_t$, blue is where we decrease it, the rest are clipped out. The y-axis is $\log\rho_t$ so that the ratio's asymmetric range $(0,\infty)$ becomes symmetric about $0$. The default $\epsilon = 0.2$ is used. </figcaption>
 </figure>
 
 
-## One equation, four gradient gates
+## One equation, five gradient gates
 
-The [SAPO paper](https://arxiv.org/abs/2511.20347) gives us a useful way to compare these policy optimization methods. At the token level, write the surrogate objective as
+The SAPO paper[^sapo] gives us a useful way to compare these policy optimization methods. At the token level, write the surrogate objective as
 
 $$
 J_t(\theta)=f(\rho_t(\theta);A_t)\,A_t.
+\tag{4}\label{eq:unified-surrogate}
 $$
 
-PPO/GRPO, DAPO, and SAPO differ mainly in their choice of $f$. Taking the gradient,
+Policy optimization methods, such as PPO/GRPO, DAPO, GSPO, SAO, and SAPO, differ mainly in their choice of the **weight function** $f$. Taking the gradient of eq. (4),
 
 $$
 \begin{aligned}
@@ -152,148 +160,81 @@ A_t f'(\rho_t;A_t)\,\nabla_\theta\rho_t \\[4pt]
 \log\pi_\theta(y_t\mid x,y_{<t})}^{\text{policy gradient}}
 }_{\text{shared}}.
 \end{aligned}
+\tag{5}\label{eq:gradient-decomposition}
 $$
 
-All methods share the same importance-weighted policy gradient: $\rho_t A_t\nabla_\theta\log\pi_\theta(y_t\mid x,y_{<t})$. Each method differs in the gate $f'(\rho_t;A_t)$, which controls how much learning signal passes through. Figures 2–5 show (left) the gate and (right) the effective per-token weight $f'(\rho_t;A_t)\,\rho_t A_t$, all on a common color scale for easy comparison.
+All methods share the term $\rho_t A_t\nabla_\theta\log\pi_\theta$. They only differ in the **gate function** $f'(\rho_t;A_t)$ that determines how much learning signal gets through.
 
+[Table 1](#table-1) summarizes the weight function $f$ and gate function $f'$ of some milestone policy optimization methods in LLM RL.
 
+<figure id="table-1" markdown="block">
 
-Table 1 summarizes the gates. PPO and GRPO use the same clipping; DAPO and SAO have different ratio gates. Only the ratio-handling logic is shown for each. GSPO's row is the same $f$ as DAPO's evaluated at the sequence pair $(\rho_s,A_s)$ instead of the token pair; [its own section](#gspo-the-same-f-one-subscript-changed) below unpacks what that substitution does and does not carry over.
-
-| Method | $f(\rho_t;A_t)$ | $f'(\rho_t;A_t)$ | Effect |
+| Method | $f(\rho_t;A_t)$ | $f'(\rho_t;A_t)$ | Insight |
 | --- | --- | --- | --- |
-| [PPO](https://arxiv.org/abs/1707.06347) (July 2017) / [GRPO](https://arxiv.org/abs/2402.03300) (February 2024) | $A_t>0:\min(\rho_t,1+\epsilon)$; $A_t\leq0:\max(\rho_t,1-\epsilon)$ | $1$ before the sign-dependent clip boundary, $0$ after it | Hard, asymmetric gating based on the sign of $A_t$ |
-| [DAPO](https://arxiv.org/abs/2503.14476) (March 2025) | $A_t>0:\min(\rho_t,1+\epsilon_{\mathrm{high}})$; $A_t\leq0:\max(\rho_t,1-\epsilon_{\mathrm{low}})$ | The same binary gate, with separate upper and lower boundaries | A higher upper bound leaves more room to increase useful low-probability tokens |
-| [GSPO](https://arxiv.org/abs/2507.18071) (July 2025) | The same as DAPO's, at $(\rho_s,A_s)$: $A_s>0:\min(\rho_s,1+\epsilon_{\mathrm{high}})$; $A_s\leq0:\max(\rho_s,1-\epsilon_{\mathrm{low}})$ | The same binary gate, in $\rho_s$ rather than $\rho_t$ | One clip decision per response instead of per token |
-| [SAO](https://arxiv.org/abs/2607.07508) (July 2026) | $\widetilde f(\rho_t)=\operatorname{clip}(\rho_t,1-\epsilon_{\mathrm{low}},1+\epsilon_{\mathrm{high}})$ | $\mathbf{1}[1-\epsilon_{\mathrm{low}}<\rho_t<1+\epsilon_{\mathrm{high}}]$ | Both signs are masked whenever the ratio leaves the trust region |
-| [SAPO](https://arxiv.org/abs/2511.20347) (November 2025) | $\dfrac{4}{\tau_t}\sigma\!\left(\tau_t(\rho_t-1)\right)$ | $4\sigma(z_t)(1-\sigma(z_t))=\mathrm{sech}^2(z_t/2)$ | The gate decays smoothly instead of switching abruptly to zero |
+| [PPO](https://arxiv.org/abs/1707.06347) (July 2017) / [GRPO](https://arxiv.org/abs/2402.03300) (February 2024) | $A_t>0:\;\min(\rho_t,1+\epsilon)$<br>$A_t\leq0:\;\max(\rho_t,1-\epsilon)$ | $\mathbf{1}\left[A_t>0,\;\rho_t<1+\epsilon\right]$<br>$+\;\mathbf{1}\left[A_t<0,\;\rho_t>1-\epsilon\right]$ | Hard, asymmetric gating based on the sign of $A_t$ |
+| [DAPO](https://arxiv.org/abs/2503.14476) (March 2025) | $A_t>0:\;\min(\rho_t,1+\epsilon_h)$<br>$A_t\leq0:\;\max(\rho_t,1-\epsilon_l)$ | $\mathbf{1}\left[A_t>0,\;\rho_t<1+\epsilon_h\right]$<br>$+\;\mathbf{1}\left[A_t<0,\;\rho_t>1-\epsilon_l\right]$ | A higher upper bound leaves more room to increase useful low-probability tokens |
+| [GSPO](https://arxiv.org/abs/2507.18071) (July 2025) | Same as DAPO at $(\rho_s,A_s)$:<br>$A_s>0:\;\min(\rho_s,1+\epsilon_h)$<br>$A_s\leq0:\;\max(\rho_s,1-\epsilon_l)$ | $\mathbf{1}\left[A_s>0,\;\rho_s<1+\epsilon_h\right]$<br>$+\;\mathbf{1}\left[A_s<0,\;\rho_s>1-\epsilon_l\right]$ | One clip decision per response instead of per token |
+| [SAPO](https://arxiv.org/abs/2511.20347) (November 2025) | $\dfrac{4}{\tau_t}\sigma\left(\tau_t(\rho_t-1)\right)$,<br>$\tau_t=\tau_{\text{pos}}$ if $A_t>0$, else $\tau_{\text{neg}}$ | $4\sigma\left(\tau_t(\rho_t-1)\right)\left(1-\sigma\left(\tau_t(\rho_t-1)\right)\right)$<br>$=\mathrm{sech}^2\left(\tfrac{\tau_t(\rho_t-1)}{2}\right)$ | The gate decays smoothly instead of switching abruptly to zero; $\tau_{\text{neg}}>\tau_{\text{pos}}$ makes it decay faster for negative advantages |
+| [SAO](https://arxiv.org/abs/2607.07508) (July 2026) | $\widetilde f(\rho_t)=\operatorname{clip}(\rho_t,1-\epsilon_l,1+\epsilon_h)$ | $\mathbf{1}\left[1-\epsilon_l<\rho_t<1+\epsilon_h\right]$ | Both signs are masked whenever the ratio leaves the trust region |
 
-<!-- For SAPO,
+<figcaption><strong>Table 1.</strong> Weight function $f$ and gate function $f'$ for milestone policy optimization methods in LLM RL.</figcaption>
+</figure>
 
-$$
-z_t=\tau_t(\rho_t-1),
-\qquad
-\tau_t=
-\begin{cases}
-\tau_{\mathrm{pos}}, & A_t>0,\\
-\tau_{\mathrm{neg}}, & A_t\leq0.
-\end{cases}
-$$
+Figures 2–6 plot the gate $f'(\rho_t;A_t)$ and the learning signal $f'(\rho_t;A_t)\,\rho_t A_t$ on the $(A_t,\log\rho_t)$ plane for each method (Figure 6 uses the sequence pair $(A_s,\rho_s)$):
 
-The paper uses $\tau_{\mathrm{neg}}>\tau_{\mathrm{pos}}$, so updates from negative-advantage tokens decay faster as they move off-policy. With the reported defaults, $\tau_{\mathrm{pos}}=1.0$ and $\tau_{\mathrm{neg}}=1.05$, the asymmetry is deliberately mild.
-
-The SAO row needs one qualification. SAO states its loss as a ratio-weighted log-policy objective and masks the weight outside the interval. The clipped $\widetilde f$ above is a gradient-equivalent surrogate: its derivative gives the same strict two-sided mask, but it is not the literal objective printed in the SAO paper. SAO also computes its ratio against the rollout policy rather than a separately maintained old policy.
-
-The plots use illustrative parameters to make these differences visible: $\epsilon_{\mathrm{low}}=0.2$ and $\epsilon_{\mathrm{high}}=0.5$ for DAPO and SAO, and $\tau_{\mathrm{pos}}=2$, $\tau_{\mathrm{neg}}=4$ for SAPO. These are not the papers' default training settings. -->
+- PPO[^ppo] ([Figure 2](#figure-ppo-gradient-weight)) clips the importance ratio $\rho_t$: once an update has encouraged a good token or discouraged a bad token enough, the gate drops to zero and the token stops contributing. This keeps policy updates small and training stable.
+- GRPO[^grpo] ([Figure 2](#figure-ppo-gradient-weight)) adds a group rollout dimension $G$ to the objective. At the token level, its gate is identical to PPO's.
+- DAPO[^dapo] ([Figure 3](#figure-dapo-gradient-weight)) raises the upper clipping threshold $\epsilon_h$, so rare tokens—whose small denominator tends to produce large $\rho_t$ values—are less likely to be clipped prematurely. The extra strip above PPO's boundary is exactly where the largest learning signals live.
+- SAO[^sao] ([Figure 4](#figure-sao-gradient-weight)) targets asynchronous training, where the current and rollout policies can drift farther apart than in PPO. $\rho_t$ can then deviate substantially from 1, so the gate behaves like a top-hat window, masking both signs whenever the ratio leaves the trust region.
+- SAPO[^sapo] ([Figure 5](#figure-sapo-gradient-weight)) replaces this hard boundary with a smooth gate. Instead of switching off a token's contribution once $\rho_t$ crosses a threshold, SAPO lets the weight decay gradually as the ratio moves away from the preferred region.
+- GSPO[^gspo] ([Figure 6](#figure-gspo-gradient-weight)) is the same move at sequence level: swap $(A_t,\rho_t)$ for sequence level $(A_s,\rho_s)$ with $\rho_s=(\pi_\theta(y\mid x)/\pi_{\mathrm{old}}(y\mid x))^{1/\lvert y\rvert}$—the geometric mean of the token ratios in eq. (1). Note that the shared factor changes as well: $\nabla_\theta\rho_s=\rho_s\cdot\frac{1}{\lvert y\rvert}\sum_t\nabla_\theta\log\pi_\theta(y_t\mid x,y_{<t})$, i.e. every token in the response receives the same length-averaged weight. The gate is DAPO's asymmetric two-wedge shape, but with GSPO's clip range ($\epsilon\sim 3\text{–}4\times10^{-4}$) $\rho_s$ stays within $10^{-3}$ of 1, so the learning signal is essentially $A_s$ alone.
 
 <figure id="figure-ppo-gradient-weight">
-  <img src="{{ '/assets/figures/mental-model-policy-optimizations/ppo-gradient-weight-heatmap.png' | relative_url }}" alt="PPO gate and effective-weight heatmaps on the advantage–log-ratio plane">
-  <figcaption><strong>Figure 2.</strong> PPO/GRPO. <em>Left:</em> the gate is exactly one inside the two active wedges and zero beyond the sign-dependent clip boundaries, so each dead zone is a quadrant wedge. <em>Right:</em> the same wedges, now carrying $\rho_t A_t$ — the sign flips with $A_t$ and the magnitude grows with $\rho_t$, which is why the surviving corners are the strongest updates in the whole plane.</figcaption>
+  <img src="{{ '/assets/figures/mental-model-policy-optimizations/ppo-gradient-weight-heatmap.png' | relative_url }}" alt="PPO gate and learning-signal heatmaps on the advantage–log-ratio plane">
+  <figcaption><strong>Figure 2.</strong> PPO/GRPO. <em>Left:</em> gate $f'$. <em>Right:</em> learning signal $f'\rho_t A_t$. Active regions are two quadrant wedges; learning signal grows with $\rho_t$ in the surviving corners.</figcaption>
 </figure>
 
 <figure id="figure-dapo-gradient-weight">
-  <img src="{{ '/assets/figures/mental-model-policy-optimizations/dapo-gradient-weight-heatmap.png' | relative_url }}" alt="DAPO gate and effective-weight heatmaps on the advantage–log-ratio plane">
-  <figcaption><strong>Figure 3.</strong> DAPO. The gate remains binary, but $\epsilon_{\mathrm{high}}>\epsilon_{\mathrm{low}}$ gives positive-advantage tokens more room to increase before clipping. The right panel shows what that room is worth: the extra strip admitted above PPO’s boundary is exactly where $\rho_t$ is largest, so it carries more weight than its area suggests.</figcaption>
+  <img src="{{ '/assets/figures/mental-model-policy-optimizations/dapo-gradient-weight-heatmap.png' | relative_url }}" alt="DAPO gate and learning-signal heatmaps on the advantage–log-ratio plane">
+  <figcaption><strong>Figure 3.</strong> DAPO. Same binary gate as Figure 2, with a wider upper wedge.</figcaption>
 </figure>
 
 <figure id="figure-sao-gradient-weight">
-  <img src="{{ '/assets/figures/mental-model-policy-optimizations/sao-gradient-weight-heatmap.png' | relative_url }}" alt="SAO gate and effective-weight heatmaps on the advantage–log-ratio plane">
-  <figcaption><strong>Figure 4.</strong> SAO. The ratio alone determines whether a token survives, so both signs are masked outside the allowed interval and the dead zones run the full width. The right panel shows the consequence: capping $\rho_t$ from above caps the effective weight too, which neither PPO nor DAPO does for $A_t<0$.</figcaption>
+  <img src="{{ '/assets/figures/mental-model-policy-optimizations/sao-gradient-weight-heatmap.png' | relative_url }}" alt="SAO gate and learning-signal heatmaps on the advantage–log-ratio plane">
+  <figcaption><strong>Figure 4.</strong> SAO. Top-hat gate. </figcaption>
 </figure>
 
 <figure id="figure-sapo-gradient-weight">
-  <img src="{{ '/assets/figures/mental-model-policy-optimizations/sapo-gradient-weight-heatmap.png' | relative_url }}" alt="SAPO gate and effective-weight heatmaps on the advantage–log-ratio plane">
-  <figcaption><strong>Figure 5.</strong> SAPO. There is no finite clipping boundary: the gate equals one at $\rho_t=1$ and decays smoothly as the token moves off-policy, so nothing is switched off outright. Dashed lines are $f'$ iso-levels, repeated on the right panel for reference. On this window the decay barely dents the effective weight: $\rho_t$ grows about as fast as the gate shrinks.</figcaption>
+  <img src="{{ '/assets/figures/mental-model-policy-optimizations/sapo-gradient-weight-heatmap.png' | relative_url }}" alt="SAPO gate and learning-signal heatmaps on the advantage–log-ratio plane">
+  <figcaption><strong>Figure 5.</strong> SAPO. Smooth gate (dashed lines: $f'$ iso-levels). <em>Right:</em> over this crop, $\rho_t$ growth and gate decay nearly cancel.</figcaption>
 </figure>
-
-PPO and DAPO decide whether a token has moved too far in the direction encouraged by its advantage. SAO rejects any token that has moved too far in either direction. SAPO replaces that binary decision with a continuously varying weight.
-
-<!-- 
-### Widening the window
-
-The right panels of Figures 2–5 already carry the shared factor, but they are cropped to $|\log\rho_t|\leq0.6$, and that crop hides SAPO's whole story. The $\rho_t$ out front grows with the ratio while SAPO's gate shrinks, and over this window the two nearly cancel: $f'\rho_t$ falls only from $1.00$ at $\rho_t=1$ to $0.99$ at the top edge. That is why SAPO's right panel looks so much like DAPO's despite the gates being completely different rules. Widen the window and the cancellation breaks.
-
-<figure id="figure-effective-coefficient">
-  <img src="{{ '/assets/figures/mental-model-policy-optimizations/effective-coefficient-curves.png' | relative_url }}" alt="Effective per-token weight against log importance ratio, for positive and negative advantage">
-  <figcaption><strong>Figure 6.</strong> The effective weight $f'(\rho_t;A_t)\,\rho_t$ at $|A_t|=1$, over a ratio window wide enough to show the tails. Shaded band marks the window of Figures 2–5.</figcaption>
-</figure>
-
-Two things follow that the cropped panels do not show.
-
-First, SAPO's weight does reach zero. The gate never does — $\mathrm{sech}^2$ is positive everywhere — but $f'\rho_t$ rises to a peak just above $\rho_t=1$ and then collapses, because the exponential decay of the gate beats the linear growth of $\rho_t$. The peak sits at $\rho_t\approx1.38$ for the $\tau=2$ used in the positive-advantage panel and at $\rho_t\approx1.11$ for $\tau=4$; with the paper's much gentler defaults it moves out to $\rho_t\approx2.1$, but the collapse still happens. SAPO does not merely attenuate far-off-policy tokens; it discards them, just without a hard boundary.
-
-Second, and less comfortably: for $A_t<0$, PPO and DAPO impose no upper bound at all. Their curves coincide — DAPO only moves the *upper* $\epsilon$, which for negative advantage is the side that was never clipped — and both grow linearly in $\rho_t$ without limit. A negative-advantage token that the current policy has come to strongly prefer receives an unboundedly large gradient. This is precisely the failure mode SAO's two-sided clip and SAPO's decay are built to remove, and it is easy to miss in Figures 2–5, where the gate for that region is a flat $1$ and the right panels are cropped before the growth becomes alarming.
-
-
-other references: https://qwen.ai/blog?id=sapo -->
-
-## GSPO: the same $f$, one subscript changed
-
-[GSPO](https://arxiv.org/abs/2507.18071) (July 2025) needs no new $f$ at all. Take the row PPO already occupies and replace the token pair by the sequence pair:
-
-$$
-f(\rho_t;A_t)\;\longrightarrow\;f(\rho_s;A_s).
-$$
-
-That is the entire method. $A_s$ is the group-normalized advantage of the whole response — the quantity GRPO already computes, before it gets broadcast to tokens — and $\rho_s$ is the *length-normalized* sequence likelihood ratio:
-
-$$
-\rho_s(\theta)
-=
-\left(\frac{\pi_\theta(y\mid x)}{\pi_{\mathrm{old}}(y\mid x)}\right)^{1/|y|}
-=
-\exp\left(
-\frac{1}{|y|}\sum_{t=1}^{|y|}
-\log\rho_t
-\right),
-$$
-
-the geometric mean of the token ratios already in play. (The paper writes these $s_i$ and $\widehat A_i$; I keep $\rho_s,A_s$ so the substitution stays legible.) Everything downstream follows by the same substitution — the objective is PPO's `min`/`clip` verbatim,
-
-$$
-J_s(\theta) = \min\left(
-\rho_s A_s,\;
-\operatorname{clip}(\rho_s, 1-\epsilon_l, 1+\epsilon_h)A_s
-\right),
-$$
-
-and so is the gate:
-
-$$
-f'(\rho_s;A_s)
-=
-\mathbf{1}\!\left[A_s>0,\; \rho_s<1+\epsilon_h\right]
-+
-\mathbf{1}\!\left[A_s<0,\; \rho_s>1-\epsilon_l\right].
-$$
-
-[Figure 6](#figure-gspo-gradient-weight) is therefore Figure 3 with relabelled axes — DAPO's asymmetric two-wedge shape, since GSPO's left and right ranges differ. Only two things are not carried over by the substitution.
-
-**The scale is three orders of magnitude smaller.** A geometric mean over $|y|$ token ratios concentrates near 1 far more tightly than any single $\rho_t$, so a window of width $0.2$ around $\rho_s$ would essentially never bind. GSPO's reported ranges are $\epsilon_l=3\times10^{-4}$ and $\epsilon_h=4\times10^{-4}$, against GRPO's $0.2$. Figure 6 uses those published values rather than the exaggerated ones used elsewhere in this post, because here the magnitude *is* the content, and [Figure 7](#figure-gspo-scale-contrast) makes the gap the subject: GSPO's entire ratio axis, drawn to scale inside PPO's plane, is thinner than the line pointing at it. This is also why GSPO is not a fifth panel in Figures 2–5 — on a shared ratio axis it would be a hairline.
-
-**The gate now fires once per response, not once per token.** Differentiating gives
-
-$$
-\nabla_\theta J_s
-=
-f'(\rho_s;A_s)\,
-\rho_s A_s \cdot
-\frac{1}{|y|}\sum_{t=1}^{|y|}
-\nabla_\theta\log\pi_\theta(y_t\mid x,y_{<t}),
-$$
-
-which is the same $f'\cdot\rho\,A\,\nabla\log\pi$ shape as before, except that the score function is now *averaged over the response* rather than evaluated at token $t$. So a single gate decision covers all $|y|$ tokens: they survive together or they are dropped together. That is the paper's actual claim — the clipping unit should match the rewarding unit, since the reward was never a statement about token $t$ in the first place.
 
 <figure id="figure-gspo-gradient-weight">
   <img src="{{ '/assets/figures/mental-model-policy-optimizations/gspo-gradient-weight-heatmap.png' | relative_url }}" alt="GSPO gradient-weight heatmap on the sequence-advantage / log-sequence-ratio plane">
-  <figcaption><strong>Figure 6.</strong> GSPO, on the $(A_s,\log\rho_s)$ plane. Identical to Figure 3 apart from the labels — separate left and right ranges make it DAPO's asymmetric two-wedge gate — except that the vertical axis spans $\pm10^{-3}$, not $\pm0.6$. That scale also empties the right panel of vertical structure: with $\rho_s$ pinned to $1$ within $10^{-3}$, the effective weight is just $A_s$.</figcaption>
+  <figcaption><strong>Figure 6.</strong> GSPO on $(A_s,\log\rho_s)$. Same wedge shape as Figure 3, but the axis spans $\pm10^{-3}$ because GSPO's clip range is three orders of magnitude tighter.</figcaption>
 </figure>
 
-<figure id="figure-gspo-scale-contrast">
-  <img src="{{ '/assets/figures/mental-model-policy-optimizations/ppo-vs-gspo-scale-contrast.png' | relative_url }}" alt="PPO and GSPO trust regions drawn on their respective ratio scales">
-  <figcaption><strong>Figure 7.</strong> The same gate on two scales. Left: PPO/GRPO at $\epsilon=0.2$ on the token ratio. Right: GSPO at its published ranges on the sequence ratio. The red line in the left panel is the right panel's full extent drawn to scale — about $600\times$ shorter than the axis containing it.</figcaption>
-</figure>
+## Takeaways
 
-A token-level variant, GSPO-token, restores per-token advantages while keeping $\rho_s$ as the clipping quantity; when every token in a response carries the same advantage it is numerically identical to GSPO.
+Using SAPO's[^sapo] generalized form of objective $J$ with weight function $f(\rho_t; A_t)$, learning signals of different RL methods can be shown on the same $(A_t,\log\rho_t)$ plane.
 
-other references: https://qwen.ai/blog?id=sapo
+- PPO / GRPO: hard token-level gate.
+- DAPO: widens the gate for useful low-probability tokens.
+- SAO: keeps only ratios inside a trust region when rollout policies become stale.
+- SAPO: turns the hard gate into a smooth one.
+- GSPO: moves the same idea from tokens to sequences.
+
+Seen this way, these methods are providing different answers to the same question: which policy-gradient signals should we trust, and how much?
+
+
+[^ppo]: Schulman et al., [*Proximal Policy Optimization Algorithms*](https://arxiv.org/abs/1707.06347), arXiv:1707.06347 (2017).
+
+[^grpo]: Shao et al., [*DeepSeekMath: Pushing the Limits of Mathematical Reasoning in Open Language Models*](https://arxiv.org/abs/2402.03300), arXiv:2402.03300 (2024).
+
+[^dapo]: Yu et al., [*DAPO: An Open-Source LLM Reinforcement Learning System at Scale*](https://arxiv.org/abs/2503.14476), arXiv:2503.14476 (2025).
+
+[^gspo]: Zheng et al., [*Group Sequence Policy Optimization*](https://arxiv.org/abs/2507.18071), arXiv:2507.18071 (2025).
+
+[^sao]: Hou et al., [*Single-Rollout Asynchronous Optimization for Agentic Reinforcement Learning*](https://arxiv.org/abs/2607.07508), arXiv:2607.07508 (2026).
+
+[^sapo]: Gao et al., [*Soft Adaptive Policy Optimization*](https://arxiv.org/abs/2511.20347), arXiv:2511.20347 (2025). See also the [Qwen Team blog post on SAPO](https://qwen.ai/blog?id=sapo).

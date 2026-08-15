@@ -27,6 +27,7 @@ trust region the method allows:
     PPO/GRPO   f'(rho) = 1[A > 0, rho < 1 + eps]  or  1[A < 0, rho > 1 - eps]
     DAPO       same, with a wider upper bound: eps_h > eps_l
     SAO        f'(rho) = 1[1 - eps_l < rho < 1 + eps_h]   -- two-sided, sign-blind
+               drawn at its published 0.3 / 5.0, hence its own axis and scale
 
 PPO and DAPO clip one sign per side, so each dead zone is a quadrant wedge. SAO
 clips on the ratio alone, so its dead zones are full-width horizontal bands.
@@ -79,6 +80,24 @@ PAPER_EPS_LOW, PAPER_EPS_HIGH = 0.2, 0.28  # DAPO, arXiv:2503.14476
 TAU_POS, TAU_NEG = 2.0, 4.0
 PAPER_TAU_POS, PAPER_TAU_NEG = 1.0, 1.05  # SAPO, arXiv:2511.20347, Sec. 5.1
 
+# SAO's published values are used verbatim rather than exaggerated, because the
+# magnitude is the point: its "strict double-sided clip" is strict in being
+# unconditional (it masks on rho alone, regardless of sign(A_t)), not in being
+# narrow. The trust region is [1 - eps_l, 1 + eps_h] = [0.7, 6.0] -- an order of
+# magnitude wider on the upper side than PPO's +/-0.2, which it has to be: rho is
+# measured against a rollout policy that may be many learner-steps stale, so a
+# PPO-width box would mask most of the batch. Drawing it at DAPO's scale would
+# hide exactly that.
+SAO_EPS_LOW, SAO_EPS_HIGH = 0.3, 5.0  # SAO, arXiv:2607.07508, Sec. 4.1 (math/TIR)
+SAO_CODING_EPS_LOW, SAO_CODING_EPS_HIGH = 0.8, 3.0  # same paper, coding-agent runs
+# Asymmetric window: log(1 + eps_h) = 1.79 and log(1 - eps_l) = -0.36, so a
+# symmetric limit would either crop the upper boundary or squash the lower dead
+# band to nothing. These bounds leave a legible band on both sides.
+SAO_LOG_RHO_LIM = (-1.0, 2.4)
+# rho reaches 6.0 inside SAO's trust region, so the shared +/-1.85 scale would
+# saturate the entire live band. This panel gets its own.
+SAO_COEF_LIM = 6.1
+
 # GSPO is the one method here whose published clip range is used verbatim rather
 # than exaggerated, because the magnitude IS the finding. Its ratio is the
 # length-normalized sequence likelihood ratio s_i = (pi_theta(y_i|x) /
@@ -97,8 +116,8 @@ INK_MUTED = "#898781"
 AXIS = "#c3c2b7"
 
 # Both panels of a method figure share one diverging scale, so the gate (which
-# only ever occupies 0..1) can be compared directly against the signed effective
-# weight beside it. Neutral gray at zero so "no gradient" reads as nothing rather
+# only ever occupies 0..1) can be compared directly against the signed learning
+# signal beside it. Neutral gray at zero so "no gradient" reads as nothing rather
 # than as a hue; red is a positive update, blue a negative one.
 BLUE_ARM = ["#cde2fb", "#9ec5f4", "#5598e7", "#2a78d6", "#184f95"]
 RED_ARM = ["#fbdad7", "#f6b3ad", "#ec7d74", "#d03b3b", "#8f2020"]
@@ -162,7 +181,7 @@ def gspo_fprime(adv, rho_s, eps_l=GSPO_EPS_LOW, eps_h=GSPO_EPS_HIGH):
     return live.astype(float)
 
 
-def sao_fprime(adv, rho, eps_l=EPS_LOW, eps_h=EPS_HIGH):
+def sao_fprime(adv, rho, eps_l=SAO_EPS_LOW, eps_h=SAO_EPS_HIGH):
     del adv  # sign-blind: the ratio alone decides
     return ((rho > 1.0 - eps_l) & (rho < 1.0 + eps_h)).astype(float)
 
@@ -232,19 +251,30 @@ METHODS = [
         "name": "SAO",
         "kind": "clip",
         "fprime": sao_fprime,
-        "params": rf"$\epsilon_l={EPS_LOW},\ \epsilon_h={EPS_HIGH}$",
+        "params": rf"$\epsilon_l={SAO_EPS_LOW:g},\ \epsilon_h={SAO_EPS_HIGH:g}$",
+        "log_lim": SAO_LOG_RHO_LIM,
+        "coef_lim": SAO_COEF_LIM,
+        # The gate is still a 0/1 mask, so it stays on the series-wide scale --
+        # otherwise it would render as a pale wash next to PPO's and DAPO's and
+        # read as a weaker gate rather than an identical one.
+        "gate_lim": COEF_LIM,
         "boundaries": [
-            (np.log1p(EPS_HIGH), r"$\log(1+\epsilon_h)$", "bottom", 0.02),
-            (np.log1p(-EPS_LOW), r"$\log(1-\epsilon_l)$", "top", -0.02),
+            (np.log1p(SAO_EPS_HIGH), r"$\log(1+\epsilon_h)$", "bottom", 0.04),
+            (np.log1p(-SAO_EPS_LOW), r"$\log(1-\epsilon_l)$", "top", -0.04),
         ],
         "regions": [
-            (A_LIM * 0.42, LOG_RHO_LIM * 0.83, "clipped for both signs"),
-            (A_LIM * 0.42, -LOG_RHO_LIM * 0.72, "clipped for both signs"),
+            (A_LIM * 0.42, 2.11, "clipped for both signs"),
+            (A_LIM * 0.42, -0.68, "clipped for both signs"),
         ],
         "short_regions": [
-            (A_LIM * 0.45, LOG_RHO_LIM * 0.85, "clipped (both signs)"),
-            (A_LIM * 0.45, -LOG_RHO_LIM * 0.75, "clipped (both signs)"),
+            (A_LIM * 0.45, 2.11, "clipped (both signs)"),
+            (A_LIM * 0.45, -0.68, "clipped (both signs)"),
         ],
+        "note": (
+            r"Published values (arXiv:2607.07508, Sec. 4.1, math/TIR runs), not exaggerated: the box is $[0.7,\ 6.0]$; "
+            r"coding-agent runs use $\epsilon_l=0.8,\ \epsilon_h=3.0$." "\n"
+            "The ratio axis and the right-hand colour scale are both wider than in Figures 2-3 -- consequences of that box."
+        ),
     },
     {
         "key": "sapo",
@@ -279,11 +309,19 @@ GSPO = {
     "xlabel": r"sequence advantage  $A_s$",
     "ylabel": r"log sequence ratio  $\log \rho_s$",
     "gate_title": r"gate  $f'(\rho_s;A_s)$",
-    "coef_title": r"effective weight  $f'(\rho_s;A_s)\,\rho_s A_s$",
+    "coef_title": r"learning signal  $f'(\rho_s;A_s)\,\rho_s A_s$",
     "sci_y": True,
     "note": (
         "Paper values, not exaggerated. Note the vertical scale: "
         r"$\pm 10^{-3}$, against $\pm 0.6$ in Figures 2–5."
+    ),
+    # Without this the right panel reads as blank rather than as a finding: at
+    # this scale rho_s carries no visible structure, which is exactly the
+    # difference from Figures 2-5 and is worth saying on the panel itself.
+    "coef_note": (
+        r"no vertical structure — $\rho_s$ is pinned to $1$"
+        "\n"
+        r"within $10^{-3}$, so the weight is $A_s$ alone"
     ),
     "boundaries": [
         (np.log1p(GSPO_EPS_HIGH), r"$\log(1+\epsilon_h)$", "bottom", GSPO_LOG_S_LIM * 0.033),
@@ -326,9 +364,17 @@ def apply_theme():
     )
 
 
+def log_bounds(log_lim):
+    """Accept a scalar (symmetric) or an explicit (lo, hi) pair."""
+    if np.isscalar(log_lim):
+        return -log_lim, log_lim
+    return tuple(log_lim)
+
+
 def grids(log_lim=LOG_RHO_LIM):
+    lo, hi = log_bounds(log_lim)
     adv_grid = np.linspace(-A_LIM, A_LIM, 801)
-    log_rho_grid = np.linspace(-log_lim, log_lim, 801)
+    log_rho_grid = np.linspace(lo, hi, 801)
     adv, log_rho = np.meshgrid(adv_grid, log_rho_grid)
     return adv, log_rho, np.exp(log_rho)
 
@@ -341,19 +387,21 @@ def draw_panel(
     rho,
     *,
     quantity="gate",
+    lim=None,
     short_labels=False,
     boundary_labels=True,
     regions=True,
 ):
     fprime = method["fprime"](adv, rho)
     field = fprime if quantity == "gate" else fprime * rho * adv
+    coef_lim = method.get("coef_lim", COEF_LIM) if lim is None else lim
 
     mesh = ax.pcolormesh(
         adv,
         log_rho,
         field,
         cmap=DIVERGING,
-        norm=Normalize(vmin=-COEF_LIM, vmax=COEF_LIM),
+        norm=Normalize(vmin=-coef_lim, vmax=coef_lim),
         shading="auto",
         rasterized=True,
     )
@@ -383,7 +431,8 @@ def draw_panel(
         for level in method["levels"]:
             for x0, x1, tau in ((0.0, A_LIM, method["tau_pos"]), (-A_LIM, 0.0, method["tau_neg"])):
                 for value in sapo_level_log_rho(level, tau):
-                    if value is None or abs(value) > method.get("log_lim", LOG_RHO_LIM):
+                    lo, hi = log_bounds(method.get("log_lim", LOG_RHO_LIM))
+                    if value is None or not (lo < value < hi):
                         continue
                     ax.plot(
                         [x0, x1],
@@ -419,8 +468,7 @@ def draw_panel(
         )
 
     ax.set_xlim(-A_LIM, A_LIM)
-    log_lim = method.get("log_lim", LOG_RHO_LIM)
-    ax.set_ylim(-log_lim, log_lim)
+    ax.set_ylim(*log_bounds(method.get("log_lim", LOG_RHO_LIM)))
     ax.set_xticks(np.linspace(-A_LIM, A_LIM, 5))
     for spine in ("top", "right"):
         ax.spines[spine].set_visible(False)
@@ -450,16 +498,19 @@ def render_single(method, adv, log_rho, rho, out_dir):
     if has_note:
         # colorbar(ax=axes) repositions from current geometry, so claim the
         # bottom margin before it is created rather than after.
-        fig.subplots_adjust(bottom=0.22)
+        fig.subplots_adjust(bottom=0.24, left=0.07, right=0.93)
 
-    mesh = draw_panel(axes[0], method, adv, log_rho, rho, quantity="gate")
-    draw_panel(
+    coef_lim = method.get("coef_lim", COEF_LIM)
+    gate_lim = method.get("gate_lim", coef_lim)
+    mesh = draw_panel(axes[0], method, adv, log_rho, rho, quantity="gate", lim=gate_lim)
+    coef_mesh = draw_panel(
         axes[1],
         method,
         adv,
         log_rho,
         rho,
         quantity="coefficient",
+        lim=coef_lim,
         boundary_labels=False,
         regions=False,
     )
@@ -471,7 +522,7 @@ def render_single(method, adv, log_rho, rho, out_dir):
         pad=10,
     )
     axes[1].set_title(
-        method.get("coef_title", r"effective weight  $f'(\rho_t;A_t)\,\rho_t A_t$"),
+        method.get("coef_title", r"learning signal  $f'(\rho_t;A_t)\,\rho_t A_t$"),
         color=INK_PRIMARY,
         fontsize=13,
         pad=10,
@@ -482,10 +533,20 @@ def render_single(method, adv, log_rho, rho, out_dir):
     if method.get("sci_y"):
         axes[0].ticklabel_format(axis="y", style="sci", scilimits=(0, 0), useMathText=True)
         axes[0].yaxis.get_offset_text().set_color(INK_MUTED)
+    if "coef_note" in method:
+        axes[1].annotate(
+            method["coef_note"],
+            xy=(0.0, 0.0),
+            ha="center",
+            va="center",
+            fontsize=10.5,
+            color=INK_SECONDARY,
+            bbox=LABEL_BOX,
+        )
     if has_note:
         fig.text(
             0.5,
-            0.035,
+            0.02,
             method["note"],
             ha="center",
             va="bottom",
@@ -499,15 +560,30 @@ def render_single(method, adv, log_rho, rho, out_dir):
         fontsize=15,
         y=0.99,
     )
-    style_colorbar(fig.colorbar(mesh, ax=axes, pad=0.015, fraction=0.035))
+    if gate_lim == coef_lim:
+        style_colorbar(fig.colorbar(mesh, ax=axes, pad=0.015, fraction=0.035))
+    else:
+        # Panels no longer share a scale, so neither may borrow the other's bar.
+        for ax, panel_mesh in zip(axes, (mesh, coef_mesh)):
+            style_colorbar(fig.colorbar(panel_mesh, ax=ax, pad=0.02, fraction=0.046))
     save(fig, out_dir / f"{method['key']}-gradient-weight-heatmap")
     plt.close(fig)
 
 
-def render_comparison(adv, log_rho, rho, out_dir):
-    fig, axes = plt.subplots(1, len(METHODS), figsize=(17.5, 4.4), sharey=True)
+def render_comparison(out_dir):
+    # Not shared-y any more: SAO's published box needs a ratio axis ~4x the
+    # others, so forcing one axis would crop its upper boundary out of frame.
+    fig, axes = plt.subplots(1, len(METHODS), figsize=(17.5, 4.4))
     for ax, method in zip(axes, METHODS):
-        mesh = draw_panel(ax, method, adv, log_rho, rho, short_labels=True, boundary_labels=False)
+        panel_grid = grids(method.get("log_lim", LOG_RHO_LIM))
+        mesh = draw_panel(
+            ax,
+            method,
+            *panel_grid,
+            lim=method.get("gate_lim", method.get("coef_lim", COEF_LIM)),
+            short_labels=True,
+            boundary_labels=False,
+        )
         ax.set_xlabel(r"advantage  $A_t$")
         ax.set_title(
             f"{method['name']}   ({method['params']})",
@@ -562,7 +638,7 @@ def render_effective_coefficient(out_dir):
         for spine in ("top", "right"):
             ax.spines[spine].set_visible(False)
 
-    axes[0].set_ylabel(r"effective weight  $f'(\rho_t;A_t)\,\rho_t$")
+    axes[0].set_ylabel(r"learning signal  $f'(\rho_t;A_t)\,\rho_t$")
     axes[0].set_ylim(0.0, 2.1)
     # Top-right of the A_t > 0 panel is empty -- every curve has decayed by then.
     axes[0].text(
@@ -608,7 +684,7 @@ def render_gspo_scale_contrast(out_dir):
     connector marks where the right panel lives inside the left one, which is a
     band roughly 2e-3 tall -- thinner than the line drawn to point at it.
 
-    Gate panels only: the effective weight would differ between the two by the
+    Gate panels only: the learning signal would differ between the two by the
     rho factor, which is exactly the scale difference this figure is about.
     """
     fig, axes = plt.subplots(1, 2, figsize=(13.0, 4.8))
@@ -685,8 +761,8 @@ def main():
     out_dir = Path(__file__).resolve().parent / "figures"
     out_dir.mkdir(parents=True, exist_ok=True)
     for method in METHODS:
-        render_single(method, adv, log_rho, rho, out_dir)
-    render_comparison(adv, log_rho, rho, out_dir)
+        render_single(method, *grids(method.get("log_lim", LOG_RHO_LIM)), out_dir)
+    render_comparison(out_dir)
     render_effective_coefficient(out_dir)
     render_gspo(out_dir)
     render_gspo_scale_contrast(out_dir)
