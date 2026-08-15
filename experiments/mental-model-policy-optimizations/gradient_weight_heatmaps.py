@@ -1,16 +1,21 @@
-"""Per-token gradient weight for the clip-family surrogates, on the (A_t, log rho_t) plane.
+"""Per-token gradient gate for the clip-family surrogates, on the (A_t, log rho_t) plane.
 
 All of these objectives share the shape J = E[f(rho_t) A_t]. What is plotted here
-is the sensitivity of that objective to the ratio,
+is the gate alone,
 
-    dJ/drho_t = f'(rho_t) * A_t,
+    f'(rho_t; A_t),
 
-which is what decides whether a token contributes at all and with what sign.
+the factor each method puts in front of the advantage. Since three of the four
+switch on sign(A_t), the gate itself is a function of both coordinates -- hence
+the semicolon -- but it carries no factor of A_t. Dropping that factor is what
+makes the panels comparable: the shape of the trust region is the whole story,
+and multiplying by A_t only tilts every panel the same way.
 
-NOTE: this is NOT the coefficient on grad log pi. Since drho_t/dtheta = rho_t *
-grad log pi, that coefficient carries an extra factor of rho_t:
+NOTE: neither this nor f' * A_t is the coefficient on grad log pi. Since
+drho_t/dtheta = rho_t * grad log pi, that coefficient carries an extra factor of
+rho_t:
 
-    grad J = f'(rho_t) * rho_t * A_t * grad log pi.
+    grad J = f'(rho_t; A_t) * rho_t * A_t * grad log pi.
 
 The rho_t factor is common to every method, so it does not affect the comparison
 between panels, but it does matter for the tail: f' -> 0 does not by itself mean
@@ -34,6 +39,14 @@ which is 1 at rho = 1 (matching the unclipped slope of the others) and decays
 smoothly, never reaching zero. There is no boundary and no dead zone -- only
 attenuation -- so that panel is drawn with f' contours instead of a hatched mask.
 
+GSPO is handled apart from the four. Its gate is PPO's, unchanged; what changes
+is the argument, from the token ratio rho_t to the length-normalized sequence
+ratio s_i, and with it the scale -- published clip ranges of 3e-4 / 4e-4 against
+GRPO's 0.2. It therefore gets its own panel on its own axis (render_gspo) plus a
+side-by-side against PPO (render_gspo_scale_contrast), and stays out of METHODS
+so the four-panel strip and the effective-coefficient curves keep a single
+shared ratio axis.
+
 Writes to this experiment's local figures/ directory. Promote to
 assets/figures/<post-slug>/ by hand once a figure is final.
 """
@@ -43,7 +56,8 @@ from pathlib import Path
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-from matplotlib.colors import LinearSegmentedColormap, TwoSlopeNorm
+from matplotlib.colors import LinearSegmentedColormap, Normalize
+from matplotlib.patches import ConnectionPatch
 
 A_LIM = 1.0
 LOG_RHO_LIM = 0.6
@@ -64,6 +78,16 @@ PAPER_EPS_LOW, PAPER_EPS_HIGH = 0.2, 0.28  # DAPO, arXiv:2503.14476
 TAU_POS, TAU_NEG = 2.0, 4.0
 PAPER_TAU_POS, PAPER_TAU_NEG = 1.0, 1.05  # SAPO, arXiv:2511.20347, Sec. 5.1
 
+# GSPO is the one method here whose published clip range is used verbatim rather
+# than exaggerated, because the magnitude IS the finding. Its ratio is the
+# length-normalized sequence likelihood ratio s_i = (pi_theta(y_i|x) /
+# pi_old(y_i|x))^(1/|y_i|), a geometric mean over tokens, so it concentrates far
+# more tightly than any single rho_t -- and the clip range shrinks by three
+# orders of magnitude to match. Exaggerating these to 0.2-scale would draw a
+# panel identical to DAPO's and delete the only thing worth showing.
+GSPO_EPS_LOW, GSPO_EPS_HIGH = 3e-4, 4e-4  # GSPO, arXiv:2507.18071, Sec. 5.1
+GSPO_LOG_S_LIM = 1.0e-3
+
 # Chart chrome and ink (light surface), from the reference palette.
 SURFACE = "#fcfcfb"
 INK_PRIMARY = "#0b0b0b"
@@ -71,14 +95,12 @@ INK_SECONDARY = "#52514e"
 INK_MUTED = "#898781"
 AXIS = "#c3c2b7"
 
-# Diverging pair: red (positive advantage) <-> blue (negative advantage),
-# neutral gray at zero so "no gradient" reads as nothing rather than as a hue.
+# The gate is non-negative and lives in [0, 1], so this is a sequential ramp, not
+# a diverging one: neutral gray at 0 so "no gradient" reads as nothing rather
+# than as a hue, deepening blue toward the unclipped slope of 1.
 BLUE_ARM = ["#cde2fb", "#9ec5f4", "#5598e7", "#2a78d6", "#184f95"]
-RED_ARM = ["#fbdad7", "#f6b3ad", "#ec7d74", "#d03b3b", "#8f2020"]
 NEUTRAL = "#f0efec"
-DIVERGING = LinearSegmentedColormap.from_list(
-    "advantage_diverging", BLUE_ARM[::-1] + [NEUTRAL] + RED_ARM
-)
+GATE = LinearSegmentedColormap.from_list("gate_sequential", [NEUTRAL] + BLUE_ARM)
 
 LABEL_BOX = dict(boxstyle="round,pad=0.25", facecolor=SURFACE, edgecolor="none", alpha=0.92)
 DASH = (0, (5, 4))
@@ -86,6 +108,21 @@ DASH = (0, (5, 4))
 # segments -- one per quadrant -- since tau switches on sign(A_t) and the
 # sigmoid has an upper and a lower branch.
 SAPO_LEVELS = [0.9, 0.8, 0.7]
+
+# The effective-coefficient figure needs a much wider ratio window than the
+# heatmaps: SAPO's f' * rho does not break away from the clip family's shared
+# rho ramp until |log rho| ~ 1.5, well outside LOG_RHO_LIM.
+EFF_LOG_RHO_LIM = 2.0
+
+# Distinct linestyles matter more than distinct hues here, because several of
+# these curves coincide exactly over parts of the range (PPO and DAPO for
+# A_t < 0; DAPO and SAO above the shared upper bound for A_t > 0).
+METHOD_STYLE = {
+    "ppo": dict(color=INK_PRIMARY, linestyle="-", linewidth=3.2),
+    "dapo": dict(color="#5598e7", linestyle=(0, (6, 3)), linewidth=2.0),
+    "sao": dict(color="#d03b3b", linestyle=(0, (2, 2.5)), linewidth=2.0),
+    "sapo": dict(color="#184f95", linestyle="-", linewidth=2.6),
+}
 
 
 # --- f'(rho) per method -------------------------------------------------------
@@ -98,6 +135,18 @@ def ppo_fprime(adv, rho, eps=EPS):
 
 def dapo_fprime(adv, rho, eps_l=EPS_LOW, eps_h=EPS_HIGH):
     live = ((adv > 0) & (rho < 1.0 + eps_h)) | ((adv < 0) & (rho > 1.0 - eps_l))
+    return live.astype(float)
+
+
+def gspo_fprime(adv, s, eps_l=GSPO_EPS_LOW, eps_h=GSPO_EPS_HIGH):
+    """Same sign-dependent clip as PPO/DAPO -- the argument is the only change.
+
+    GSPO's objective (Eq. 5 of arXiv:2507.18071) is PPO's min/clip verbatim with
+    (rho_t, A_t) replaced by (s_i, A_i), so the gate has the identical algebraic
+    form. The paper's left and right ranges differ (3e-4 vs 4e-4), which makes
+    the shape DAPO's rather than PPO's -- asymmetric about s_i = 1.
+    """
+    live = ((adv > 0) & (s < 1.0 + eps_h)) | ((adv < 0) & (s > 1.0 - eps_l))
     return live.astype(float)
 
 
@@ -205,6 +254,49 @@ METHODS = [
 ]
 
 
+# GSPO is kept out of METHODS on purpose. The four-panel strip and the
+# effective-coefficient curves both share a single ratio axis, and GSPO's axis is
+# ~600x narrower; dropping it into either would either blank the panel or force
+# every other method into a hairline. It gets its own figure, on its own scale,
+# plus an explicit side-by-side scale contrast.
+GSPO = {
+    "key": "gspo",
+    "name": "GSPO",
+    "kind": "clip",
+    "fprime": gspo_fprime,
+    "log_lim": GSPO_LOG_S_LIM,
+    "params": r"$\epsilon_l=3\times10^{-4},\ \epsilon_h=4\times10^{-4}$",
+    "xlabel": r"sequence advantage  $\widehat{A}_i$",
+    "ylabel": r"log sequence ratio  $\log s_i$",
+    "cbar_label": r"gate  $f'(s_i;\, \widehat{A}_i)$",
+    "sci_y": True,
+    "note": (
+        "Paper values, not exaggerated. Note the vertical scale: "
+        r"$\pm 10^{-3}$, against $\pm 0.6$ in Figures 2–5."
+    ),
+    "boundaries": [
+        (np.log1p(GSPO_EPS_HIGH), r"$\log(1+\epsilon_h)$", "bottom", GSPO_LOG_S_LIM * 0.033),
+        (np.log1p(-GSPO_EPS_LOW), r"$\log(1-\epsilon_l)$", "top", -GSPO_LOG_S_LIM * 0.033),
+    ],
+    "regions": [
+        (
+            A_LIM * 0.55,
+            GSPO_LOG_S_LIM * 0.78,
+            "clipped\n$\\widehat{A}_i>0,\\ s_i>1+\\epsilon_h$",
+        ),
+        (
+            -A_LIM * 0.55,
+            -GSPO_LOG_S_LIM * 0.68,
+            "clipped\n$\\widehat{A}_i<0,\\ s_i<1-\\epsilon_l$",
+        ),
+    ],
+    "short_regions": [
+        (A_LIM * 0.55, GSPO_LOG_S_LIM * 0.8, "clipped"),
+        (-A_LIM * 0.55, -GSPO_LOG_S_LIM * 0.7, "clipped"),
+    ],
+}
+
+
 # --- rendering ----------------------------------------------------------------
 
 
@@ -231,23 +323,22 @@ def apply_theme():
     )
 
 
-def grids():
+def grids(log_lim=LOG_RHO_LIM):
     adv_grid = np.linspace(-A_LIM, A_LIM, 801)
-    log_rho_grid = np.linspace(-LOG_RHO_LIM, LOG_RHO_LIM, 801)
+    log_rho_grid = np.linspace(-log_lim, log_lim, 801)
     adv, log_rho = np.meshgrid(adv_grid, log_rho_grid)
     return adv, log_rho, np.exp(log_rho)
 
 
 def draw_panel(ax, method, adv, log_rho, rho, *, short_labels=False, boundary_labels=True):
     fprime = method["fprime"](adv, rho)
-    weight = fprime * adv
 
     mesh = ax.pcolormesh(
         adv,
         log_rho,
-        weight,
-        cmap=DIVERGING,
-        norm=TwoSlopeNorm(vmin=-A_LIM, vcenter=0.0, vmax=A_LIM),
+        fprime,
+        cmap=GATE,
+        norm=Normalize(vmin=0.0, vmax=1.0),
         shading="auto",
         rasterized=True,
     )
@@ -255,7 +346,7 @@ def draw_panel(ax, method, adv, log_rho, rho, *, short_labels=False, boundary_la
     if method["kind"] == "clip":
         # Secondary encoding: hatch the zero-gradient region so "nothing happens
         # here" is not carried by color alone.
-        dead = np.ma.masked_where(fprime > 0, np.ones_like(weight))
+        dead = np.ma.masked_where(fprime > 0, np.ones_like(fprime))
         ax.contourf(adv, log_rho, dead, levels=[0.5, 1.5], colors="none", hatches=["//////"])
         for level, label, va, offset in method["boundaries"]:
             ax.axhline(level, color=INK_SECONDARY, linestyle=DASH, linewidth=1.6)
@@ -313,15 +404,15 @@ def draw_panel(ax, method, adv, log_rho, rho, *, short_labels=False, boundary_la
         )
 
     ax.set_xlim(-A_LIM, A_LIM)
-    ax.set_ylim(-LOG_RHO_LIM, LOG_RHO_LIM)
+    ax.set_ylim(-method.get("log_lim", LOG_RHO_LIM), method.get("log_lim", LOG_RHO_LIM))
     ax.set_xticks(np.linspace(-A_LIM, A_LIM, 5))
     for spine in ("top", "right"):
         ax.spines[spine].set_visible(False)
     return mesh
 
 
-def style_colorbar(cbar):
-    cbar.set_label(r"$f'(\rho_t)\,A_t$", color=INK_SECONDARY)
+def style_colorbar(cbar, label=r"gate  $f'(\rho_t;\, A_t)$"):
+    cbar.set_label(label, color=INK_SECONDARY)
     cbar.outline.set_visible(False)
     cbar.ax.tick_params(color=INK_MUTED, labelcolor=INK_MUTED)
 
@@ -329,15 +420,32 @@ def style_colorbar(cbar):
 def render_single(method, adv, log_rho, rho, out_dir):
     fig, ax = plt.subplots(figsize=(7.0, 4.6))
     mesh = draw_panel(ax, method, adv, log_rho, rho)
-    ax.set_xlabel(r"advantage  $A_t$")
-    ax.set_ylabel(r"log importance ratio  $\log \rho_t$")
+    ax.set_xlabel(method.get("xlabel", r"advantage  $A_t$"))
+    ax.set_ylabel(method.get("ylabel", r"log importance ratio  $\log \rho_t$"))
+    if method.get("sci_y"):
+        ax.ticklabel_format(axis="y", style="sci", scilimits=(0, 0), useMathText=True)
+        ax.yaxis.get_offset_text().set_color(INK_MUTED)
+    if "note" in method:
+        ax.text(
+            0.5,
+            -0.205,
+            method["note"],
+            transform=ax.transAxes,
+            ha="center",
+            va="top",
+            fontsize=9.5,
+            color=INK_MUTED,
+        )
     ax.set_title(
         rf"{method['name']}   ({method['params']})",
         color=INK_PRIMARY,
         fontsize=14,
         pad=12,
     )
-    style_colorbar(fig.colorbar(mesh, ax=ax, pad=0.02))
+    style_colorbar(
+        fig.colorbar(mesh, ax=ax, pad=0.02),
+        method.get("cbar_label", r"gate  $f'(\rho_t;\, A_t)$"),
+    )
     fig.tight_layout()
     save(fig, out_dir / f"{method['key']}-gradient-weight-heatmap")
     plt.close(fig)
@@ -360,6 +468,160 @@ def render_comparison(adv, log_rho, rho, out_dir):
     plt.close(fig)
 
 
+def render_effective_coefficient(out_dir):
+    """f'(rho; A) * rho over a wide ratio window, at |A_t| = 1.
+
+    The heatmaps deliberately strip the shared rho_t factor. This figure puts it
+    back, because for SAPO the product is where the real behaviour lives: the
+    sech^2 decay and the linear growth in rho nearly cancel over the heatmaps'
+    +/-0.6 window (f' rho falls only from 1.00 to 0.99), so SAPO's attenuation is
+    invisible at that zoom. Widened to +/-2 the cancellation breaks and the
+    coefficient collapses to zero -- smoothly, where the clip family falls off a
+    cliff.
+
+    Two panels because f' switches on sign(A_t). Note that PPO and DAPO coincide
+    exactly on the A_t < 0 panel: DAPO only moves the upper bound.
+    """
+    log_rho = np.linspace(-EFF_LOG_RHO_LIM, EFF_LOG_RHO_LIM, 4001)
+    rho = np.exp(log_rho)
+
+    fig, axes = plt.subplots(1, 2, figsize=(12.5, 4.6), sharey=True)
+    for ax, sign, title in (
+        (axes[0], 1.0, r"$A_t > 0$"),
+        (axes[1], -1.0, r"$A_t < 0$"),
+    ):
+        adv = np.full_like(rho, sign)
+        for method in METHODS:
+            style = METHOD_STYLE[method["key"]]
+            ax.plot(
+                log_rho,
+                method["fprime"](adv, rho) * rho,
+                label=method["name"],
+                **style,
+            )
+        ax.axvline(0.0, color=AXIS, linewidth=1.0)
+        ax.axhline(0.0, color=AXIS, linewidth=1.0)
+        # Mark the heatmaps' window so the two figures can be read together.
+        ax.axvspan(-LOG_RHO_LIM, LOG_RHO_LIM, color=NEUTRAL, zorder=0)
+        ax.set_xlabel(r"log importance ratio  $\log \rho_t$")
+        ax.set_title(title, color=INK_PRIMARY, fontsize=13, pad=10)
+        ax.set_xlim(-EFF_LOG_RHO_LIM, EFF_LOG_RHO_LIM)
+        for spine in ("top", "right"):
+            ax.spines[spine].set_visible(False)
+
+    axes[0].set_ylabel(r"effective weight  $f'(\rho_t;A_t)\,\rho_t$")
+    axes[0].set_ylim(0.0, 2.1)
+    # Top-right of the A_t > 0 panel is empty -- every curve has decayed by then.
+    axes[0].text(
+        1.25,
+        1.95,
+        "shaded: window\nof Figures 2–5",
+        ha="center",
+        va="top",
+        fontsize=9.5,
+        color=INK_MUTED,
+    )
+    # The headline of this figure: for A_t < 0 neither PPO nor DAPO imposes an
+    # upper bound, so past SAO's cliff their weight just keeps growing with rho.
+    axes[1].annotate(
+        "PPO and DAPO coincide, and keep growing:\n"
+        r"no upper bound when $A_t<0$",
+        xy=(0.78, 2.02),
+        xytext=(-1.92, 1.62),
+        fontsize=10,
+        color=INK_SECONDARY,
+        bbox=LABEL_BOX,
+        arrowprops=dict(arrowstyle="->", color=INK_MUTED, linewidth=1.1),
+    )
+    axes[0].legend(frameon=False, fontsize=10.5, loc="upper left")
+    fig.tight_layout()
+    save(fig, out_dir / "effective-coefficient-curves")
+    plt.close(fig)
+
+
+def render_gspo(out_dir):
+    adv, log_s, s = grids(GSPO_LOG_S_LIM)
+    render_single(GSPO, adv, log_s, s, out_dir)
+
+
+def render_gspo_scale_contrast(out_dir):
+    """PPO/GRPO and GSPO side by side, each on the ratio scale its epsilon implies.
+
+    The gates are the same function -- both panels are the two-wedge picture of
+    Figure 2/3. Putting them next to each other is only worth a figure because
+    the axes differ by ~600x, and that difference is not cosmetic: s_i is a
+    geometric mean over |y_i| token ratios, so it sits far closer to 1 than any
+    individual rho_t, and a 0.2-wide window around it would never bind. The
+    connector marks where the right panel lives inside the left one, which is a
+    band roughly 7e-4 tall -- thinner than the line drawn to point at it.
+    """
+    fig, axes = plt.subplots(1, 2, figsize=(13.0, 4.8))
+
+    ppo = METHODS[0]
+    adv, log_rho, rho = grids()
+    draw_panel(axes[0], ppo, adv, log_rho, rho, boundary_labels=False)
+    axes[0].set_ylabel(r"log importance ratio  $\log \rho_t$")
+    axes[0].set_xlabel(r"advantage  $A_t$")
+    axes[0].set_title(
+        rf"PPO / GRPO — token ratio   ({ppo['params']})",
+        color=INK_PRIMARY,
+        fontsize=13,
+        pad=10,
+    )
+
+    adv_s, log_s, s = grids(GSPO_LOG_S_LIM)
+    mesh = draw_panel(axes[1], GSPO, adv_s, log_s, s, boundary_labels=False)
+    axes[1].set_ylabel(r"log sequence ratio  $\log s_i$")
+    axes[1].set_xlabel(r"sequence advantage  $\widehat{A}_i$")
+    axes[1].set_title(
+        rf"GSPO — sequence ratio   ({GSPO['params']})",
+        color=INK_PRIMARY,
+        fontsize=13,
+        pad=10,
+    )
+    axes[1].ticklabel_format(axis="y", style="sci", scilimits=(0, 0), useMathText=True)
+    axes[1].yaxis.get_offset_text().set_color(INK_MUTED)
+
+    # The right panel's full extent, drawn to scale inside the left panel. At
+    # +/-1e-3 against +/-0.6 this is 1/600 of the axis height, so it is a line.
+    axes[0].axhspan(
+        -GSPO_LOG_S_LIM,
+        GSPO_LOG_S_LIM,
+        color="#d03b3b",
+        linewidth=0,
+        zorder=5,
+    )
+    axes[0].annotate(
+        "the whole right panel,\ndrawn to scale here",
+        xy=(-A_LIM * 0.45, 0.0),
+        xytext=(-A_LIM * 0.5, LOG_RHO_LIM * 0.55),
+        fontsize=10,
+        color="#8f2020",
+        ha="center",
+        bbox=LABEL_BOX,
+        arrowprops=dict(arrowstyle="->", color="#d03b3b", linewidth=1.2),
+        zorder=6,
+    )
+
+    for x in (-GSPO_LOG_S_LIM, GSPO_LOG_S_LIM):
+        fig.add_artist(
+            ConnectionPatch(
+                xyA=(A_LIM, x),
+                coordsA=axes[0].transData,
+                xyB=(-A_LIM, np.sign(x) * GSPO_LOG_S_LIM),
+                coordsB=axes[1].transData,
+                color=AXIS,
+                linewidth=1.0,
+                linestyle=DASH,
+            )
+        )
+
+    fig.tight_layout()
+    style_colorbar(fig.colorbar(mesh, ax=axes, pad=0.012, fraction=0.022), r"gate  $f'$")
+    save(fig, out_dir / "ppo-vs-gspo-scale-contrast")
+    plt.close(fig)
+
+
 def save(fig, stem):
     fig.savefig(stem.with_suffix(".png"), dpi=200)
     fig.savefig(stem.with_suffix(".pdf"))
@@ -374,6 +636,9 @@ def main():
     for method in METHODS:
         render_single(method, adv, log_rho, rho, out_dir)
     render_comparison(adv, log_rho, rho, out_dir)
+    render_effective_coefficient(out_dir)
+    render_gspo(out_dir)
+    render_gspo_scale_contrast(out_dir)
 
 
 if __name__ == "__main__":
