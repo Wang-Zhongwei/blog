@@ -1,0 +1,9 @@
+---
+# Rendered by Jekyll so the sitemap URL always matches site.url/baseurl.
+layout: null
+sitemap: false
+---
+User-agent: *
+Allow: /
+
+Sitemap: {{ '/sitemap.xml' | absolute_url }}

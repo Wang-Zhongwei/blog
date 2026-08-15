@@ -1,6 +1,11 @@
 title: "Notes from the Bottle"   # pick your own blog title
 description: "Occasional notes on ML, physics, and things in between"
 author: "Zhongwei Wang"
+lang: en
+
+# Used by the JSON-LD block in _layouts/default.html. Search engines use these
+# to tie the site to a person; drop any line you do not want emitted.
+author_url: "https://github.com/Wang-Zhongwei"
 
 # Layouts, styles and the light/dark toggle live in this repo (_layouts/,
 # assets/css/main.css) — no external theme gem, so nothing to keep in sync
@@ -21,6 +26,7 @@ excerpt_separator: "\n\n"
 
 plugins:
   - jekyll-feed
+  - jekyll-sitemap
 
 exclude:
   - README.md
@@ -28,3 +34,4 @@ exclude:
   - preview.sh
   - Gemfile
   - Gemfile.lock
+  - experiments
