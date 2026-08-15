@@ -1,12 +1,12 @@
 ---
 layout: post
 title: "A mental model to unify RL policy losses"
-subtitle: "The diagram to compare PPO/GRPO, DAPO, GSPO, SAO, SAPO..."
+subtitle: "The diagram that comapres PPO/GRPO, DAPO, GSPO, SAO, SAPO..."
 date: 2026-08-14
 tags: [rl, ppo, grpo, gspo, dapo, sao, sapo]
 ---
 
-Inspired by the [Feynman technique](https://en.wikipedia.org/wiki/Learning_by_teaching), I'll explain landmark policy optimization methods used in LLM RL as simply as I can—starting with PPO[^ppo] and GRPO[^grpo], then recent variants DAPO[^dapo], GSPO[^gspo], SAO[^sao], and SAPO[^sapo]. Writing them out helps me understand them better, and hopefully it helps you too.
+Inspired by the [Feynman technique](https://en.wikipedia.org/wiki/Learning_by_teaching), I'll explain some famous LLM RL losses as simply as I can—starting with PPO[^ppo] and GRPO[^grpo], then recent variants DAPO[^dapo], GSPO[^gspo], SAO[^sao], and SAPO[^sapo]. Writing them out helps me understand them better, and hopefully it helps you too.
 
 > 💡 **New to PPO or GRPO?** These introductions are good places to start before reading this blog: [PPO](https://huggingface.co/blog/deep-rl-ppo) and [GRPO](https://huggingface.co/blog/garg-aayush/derive-grpo-loss).
 

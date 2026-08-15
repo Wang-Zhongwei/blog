@@ -87,8 +87,8 @@
 
 html {
   /* Root scale: every rem below is relative to this, so one knob sizes the
-     whole page. 112.5% of the 16px default = 18px base. */
-  font-size: 112.5%;
+     whole page. 100% of the 16px default = 16px base. */
+  font-size: 100%;
   -webkit-text-size-adjust: 100%;
   scroll-behavior: smooth;
 }
