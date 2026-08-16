@@ -17,19 +17,26 @@ layout: default
 <section class="post-list">
   {%- if site.posts.size > 0 -%}
     {%- for post in site.posts -%}
-    <article class="post-item">
-      {% include post-meta.html item=post body=post.content date_format="%b %-d, %Y" %}
-      <h2 class="post-item-title">
-        <a href="{{ post.url | relative_url }}">{{ post.title | escape }}</a>
-      </h2>
-      {%- if post.subtitle %}
-      <p class="post-item-subtitle">{{ post.subtitle | escape }}</p>
+    <article class="post-item{% if post.image %} post-item--with-thumb{% endif %}">
+      {%- if post.image %}
+      <a class="post-item-thumb" href="{{ post.url | relative_url }}" tabindex="-1" aria-hidden="true">
+        <img src="{{ post.image | relative_url }}" alt="" loading="lazy">
+      </a>
       {%- endif %}
-      {%- assign clean = post.excerpt | strip_html | normalize_whitespace | strip -%}
-      {%- if clean != '' %}
-      <p class="post-item-excerpt">{{ clean | truncate: 220 }}</p>
-      {%- endif %}
-      <a class="read-more" href="{{ post.url | relative_url }}">Read<span aria-hidden="true"> &rarr;</span></a>
+      <div class="post-item-body">
+        {% include post-meta.html item=post body=post.content date_format="%b %-d, %Y" %}
+        <h2 class="post-item-title">
+          <a href="{{ post.url | relative_url }}">{{ post.title | escape }}</a>
+        </h2>
+        {%- if post.subtitle %}
+        <p class="post-item-subtitle">{{ post.subtitle | escape }}</p>
+        {%- endif %}
+        {%- assign clean = post.excerpt | strip_html | normalize_whitespace | strip -%}
+        {%- if clean != '' %}
+        <p class="post-item-excerpt">{{ clean | truncate: 165 }}</p>
+        {%- endif %}
+        <a class="read-more" href="{{ post.url | relative_url }}">Read<span aria-hidden="true"> &rarr;</span></a>
+      </div>
     </article>
     {%- endfor -%}
   {%- else -%}

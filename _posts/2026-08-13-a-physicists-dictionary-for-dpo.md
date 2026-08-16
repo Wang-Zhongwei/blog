@@ -4,6 +4,7 @@ title: "A Statistical Mechanics View of KL-Regularized RL"
 subtitle: "The math behind DPO, PPO, and the GRPO family — and whether training reaches the Gibbs minimum"
 date: 2026-08-13
 tags: [statistical-mechanics, rlhf, dpo]
+image: /assets/figures/a-physicists-dictionary-for-dpo/free-energy-landscape.png
 ---
 
 Preference post-training is often formulated as **KL-regularized reward maximization**: increase expected reward while staying close to a reference policy. Its optimum takes the Gibbs form

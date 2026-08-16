@@ -33,7 +33,8 @@
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 10px 30px -18px rgba(0, 0, 0, 0.8);
 
   /* Type */
-  --display-opsz: 14;   /* see the display-type rule below — lower = sturdier */
+  --display-opsz: 8;    /* see the display-type rule below — lower = sturdier */
+  --display-wght: 800;  /* needs the 400..900 variable range requested in <head> */
   --font-display: "Bodoni Moda", "Didot", "Bodoni MT", Georgia, serif;
   --font-body: "Source Serif 4", "Source Serif Pro", Charter, Georgia, Cambria, serif;
   --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -57,7 +58,7 @@
 .post-content h2,
 .post-content h3,
 .post-content h4 {
-  font-variation-settings: "opsz" var(--display-opsz), "wght" 700;
+  font-variation-settings: "opsz" var(--display-opsz), "wght" var(--display-wght);
 }
 
 /* Light — cool paper. Opt-in only, via the header toggle. */
@@ -267,8 +268,8 @@ a:hover { color: var(--hot-bright); }
 .intro-title {
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: clamp(2.4rem, 7vw, 3.25rem);
-  line-height: 1.06;
+  font-size: clamp(2rem, 5.4vw, 2.6rem);
+  line-height: 1.08;
   letter-spacing: -0.015em;
   color: var(--ink);
   margin: 0;
@@ -280,7 +281,7 @@ a:hover { color: var(--hot-bright); }
 .intro-tagline {
   margin: 0.6rem 0 0;
   color: var(--muted);
-  font-size: 1.12rem;
+  font-size: 1.02rem;
   font-style: italic;
   max-width: min(100%, 42rem);
   text-wrap: pretty;
@@ -300,6 +301,51 @@ a:hover { color: var(--hot-bright); }
 }
 .post-item:first-child { border-top: none; padding-top: 0; }
 
+.post-item--with-thumb {
+  display: flex;
+  gap: 1.9rem;
+  align-items: stretch;   /* thumb column takes the full height of the text */
+}
+.post-item-body { min-width: 0; }  /* lets the excerpt truncate instead of forcing the row wider */
+
+/* No card, no frame: the figures ship on a baked-in white canvas, so instead of
+   boxing that white in, it is blended away — multiplied into the paper in light
+   mode, inverted to the ink in dark mode. The plot then reads as if it were
+   drawn straight onto the page. */
+.post-item-thumb {
+  flex: none;
+  width: 18rem;
+  display: flex;
+  align-items: center;    /* figure sits centred in the full-height column */
+  transition: transform 0.22s ease;
+}
+.post-item-thumb img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 100%;
+  /* Data figures, not photographs: cropping to fill the box cuts off the axes
+     and legend and leaves an unreadable swatch. Fit the whole plot instead. */
+  object-fit: contain;
+  mix-blend-mode: multiply;
+}
+:root:not([data-theme="light"]) .post-item-thumb img {
+  /* Deliberately NOT inverted. Inverting would hide the white canvas, but it
+     also reverses perceptual colormaps — viridis encodes magnitude in lightness,
+     so an inverted colorbar reads backwards. Dim it instead, matching the
+     in-post figure treatment so the same plot looks the same in both places.
+     The real fix is a dark-styled re-export of the figures. */
+  filter: brightness(0.86) contrast(1.04);
+  mix-blend-mode: normal;
+}
+.post-item:hover .post-item-thumb { transform: translateY(-3px); }
+
+/* Below this, thumb-beside-text gets cramped; stack the thumb above instead. */
+@media (max-width: 34rem) {
+  .post-item--with-thumb { flex-direction: column; }
+  .post-item-thumb { width: 100%; }
+}
+
 .post-meta {
   display: flex;
   align-items: center;
@@ -310,8 +356,8 @@ a:hover { color: var(--hot-bright); }
 .post-item-title {
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 1.75rem;
-  line-height: 1.18;
+  font-size: 1.45rem;
+  line-height: 1.2;
   letter-spacing: -0.01em;
   margin: 0.55rem 0 0;
   text-wrap: balance;
@@ -323,9 +369,13 @@ a:hover { color: var(--hot-bright); }
   margin: 0.4rem 0 0;
   color: var(--muted);
   font-style: italic;
+  font-size: 0.97rem;
 }
 
-.post-item-excerpt { margin: 0.75rem 0 0; }
+.post-item-excerpt {
+  margin: 0.7rem 0 0;
+  font-size: 0.95rem;
+}
 
 .read-more {
   display: inline-block;
