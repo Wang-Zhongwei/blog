@@ -1,6 +1,6 @@
 ---
 layout: post
-title: "A mental model to unify RL policy losses"
+title: "A Mental Model to Unify RL Policy Losses"
 subtitle: "The diagram that compares PPO/GRPO, DAPO, GSPO, SAO, SAPO..."
 date: 2026-08-14
 tags: [rl, ppo, grpo, gspo, dapo, sao, sapo]
