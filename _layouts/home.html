@@ -31,7 +31,21 @@ layout: default
         {%- if post.subtitle %}
         <p class="post-item-subtitle">{{ post.subtitle | escape }}</p>
         {%- endif %}
-        {%- assign clean = post.excerpt | strip_html | normalize_whitespace | strip -%}
+        {%- comment -%}
+          Footnote markers render as <sup id="fnref:x"><a ...>1</a></sup>. Running
+          strip_html alone drops the tags but keeps the digit, welding it onto the
+          preceding word — "PPO[^ppo]" comes out as "PPO1". Liquid has no regex, so
+          split each <sup>...</sup> span out whole before stripping the remainder.
+        {%- endcomment -%}
+        {%- assign chunks = post.excerpt | split: '<sup' -%}
+        {%- assign excerpt_html = chunks | first -%}
+        {%- for chunk in chunks offset: 1 -%}
+          {%- assign after = chunk | split: '</sup>' -%}
+          {%- if after.size > 1 -%}
+            {%- assign excerpt_html = excerpt_html | append: after[1] -%}
+          {%- endif -%}
+        {%- endfor -%}
+        {%- assign clean = excerpt_html | strip_html | normalize_whitespace | strip -%}
         {%- if clean != '' %}
         <p class="post-item-excerpt">{{ clean | truncate: 165 }}</p>
         {%- endif %}

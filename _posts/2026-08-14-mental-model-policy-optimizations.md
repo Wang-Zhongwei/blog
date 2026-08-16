@@ -137,7 +137,7 @@ Once the policy has already moved far enough against this token, further decreas
 </figure>
 
 
-## One equation, five gradient gates
+## Generalized RL objective
 
 The SAPO paper[^sapo] gives us a useful way to compare these policy optimization methods. At the token level, write the surrogate objective as
 
