@@ -257,14 +257,14 @@ a:hover { color: var(--hot-bright); }
 
 .intro {
   max-width: var(--measure);
-  margin: 0 auto 4rem;
+  margin: 0 auto 2.5rem;
   padding-inline: var(--gutter);
 }
 
 .intro-title {
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: clamp(2.4rem, 7vw, 3.6rem);
+  font-size: clamp(2.4rem, 7vw, 3.25rem);
   line-height: 1.06;
   letter-spacing: -0.015em;
   color: var(--ink);
@@ -272,12 +272,15 @@ a:hover { color: var(--hot-bright); }
   text-wrap: balance;
 }
 
+/* Sized to clear the column on one line; `pretty` keeps a lone word off the
+   last line when it does wrap on narrow screens. */
 .intro-tagline {
-  margin: 1rem 0 0;
+  margin: 0.6rem 0 0;
   color: var(--muted);
-  font-size: 1.26rem;
+  font-size: 1.12rem;
   font-style: italic;
-  max-width: 34rem;
+  max-width: min(100%, 42rem);
+  text-wrap: pretty;
 }
 
 .post-list {
@@ -360,11 +363,13 @@ a:hover { color: var(--hot-bright); }
   line-height: 1.5;
 }
 
+/* Spans the measure and dissolves to the right, so it reads as a divider
+   into the post list rather than a stub floating under the title. */
 .title-rule {
-  height: 2px;
-  width: 5.5rem;
-  margin-top: 1.6rem;
-  background: linear-gradient(90deg, var(--cold), var(--hot));
+  height: 1px;
+  width: 100%;
+  margin-top: 1.4rem;
+  background: linear-gradient(90deg, var(--cold), var(--hot) 28%, transparent);
 }
 
 .tag-list {
