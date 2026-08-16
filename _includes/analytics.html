@@ -1,0 +1,15 @@
+{%- comment -%}
+  GoatCounter: cookie-less page counter, so no consent banner is needed. ~3KB,
+  loaded async so it never blocks render.
+
+  Emitted only when site.goatcounter_code is set, which keeps the beacon out of
+  local builds and forks. count.js filters localhost, 127.*, private ranges and
+  file:// on its own, so `jekyll serve` traffic is already excluded.
+
+  A Liquid comment rather than an HTML one: this note stays in the source but is
+  stripped at build time instead of shipping to every visitor.
+{%- endcomment -%}
+{%- if site.goatcounter_code and site.goatcounter_code != "" %}
+<script data-goatcounter="https://{{ site.goatcounter_code }}.goatcounter.com/count"
+        async src="https://gc.zgo.at/count.js"></script>
+{%- endif -%}

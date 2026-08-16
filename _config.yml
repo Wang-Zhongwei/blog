@@ -17,6 +17,13 @@ author_url: "https://github.com/Wang-Zhongwei"
 baseurl: "/blog"
 url: "https://wang-zhongwei.github.io"
 
+# GoatCounter analytics. Set this to your site code — the subdomain you chose at
+# goatcounter.com, i.e. just "nearcriticality" for nearcriticality.goatcounter.com.
+# Leaving it empty disables the snippet entirely, so local builds stay clean.
+# GoatCounter's count.js already ignores localhost and private IPs, so there is
+# nothing extra to guard during development.
+goatcounter_code: "nearcriticality"
+
 markdown: kramdown
 kramdown:
   math_engine: mathjax
