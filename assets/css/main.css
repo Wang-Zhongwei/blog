@@ -6,31 +6,34 @@
    for the β sweep the writing is about. Amber is the accent; the cool blue is
    its cold-side counterpart and stays secondary.
 
-   Theme tokens follow the three-state pattern: bare :root carries the full
-   light palette, and dark is redefined both for the OS preference (guarded so
-   an explicit light choice still wins) and for the explicit [data-theme] stamp.
-   Components only ever read tokens, never raw colors.
+   Theme tokens: bare :root carries the full dark palette, which is what every
+   first-time visitor gets regardless of OS preference. Light is opt-in through
+   the header toggle, which stamps data-theme="light" on <html> and persists the
+   choice in localStorage. Components only ever read tokens, never raw colors.
    ========================================================================== */
 
 :root {
-  /* Light — cool paper */
-  --bg:         #f4f6f8;
-  --surface:    #ffffff;
-  --ink:        #12171f;
-  --ink-soft:   #2c3542;
-  --muted:      #5c6675;
-  --rule:       #dde2e9;
-  --rule-soft:  #e8ecf1;
+  /* Dark — plotted ink. The default. */
+  color-scheme: dark;
 
-  --hot:        #a3490f;   /* accent */
-  --hot-bright: #c25c18;
-  --cold:       #1d5c88;
-  --accent-soft: rgba(163, 73, 15, 0.09);
+  --bg:         #0b0f14;
+  --surface:    #121922;
+  --ink:        #e8edf3;
+  --ink-soft:   #c6cedb;
+  --muted:      #8b96a6;
+  --rule:       #212b37;
+  --rule-soft:  #1a222c;
 
-  --code-bg:    #eef1f5;
-  --shadow: 0 1px 2px rgba(18, 23, 31, 0.06), 0 8px 24px -16px rgba(18, 23, 31, 0.28);
+  --hot:        #f2a758;   /* accent */
+  --hot-bright: #ffbc72;
+  --cold:       #63c4e4;
+  --accent-soft: rgba(242, 167, 88, 0.13);
+
+  --code-bg:    #141c25;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 10px 30px -18px rgba(0, 0, 0, 0.8);
 
   /* Type */
+  --display-opsz: 14;   /* see the display-type rule below — lower = sturdier */
   --font-display: "Bodoni Moda", "Didot", "Bodoni MT", Georgia, serif;
   --font-body: "Source Serif 4", "Source Serif Pro", Charter, Georgia, Cambria, serif;
   --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -41,42 +44,41 @@
   --gutter: 1.5rem;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg:         #0b0f14;
-    --surface:    #121922;
-    --ink:        #e8edf3;
-    --ink-soft:   #c6cedb;
-    --muted:      #8b96a6;
-    --rule:       #212b37;
-    --rule-soft:  #1a222c;
-
-    --hot:        #f2a758;
-    --hot-bright: #ffbc72;
-    --cold:       #63c4e4;
-    --accent-soft: rgba(242, 167, 88, 0.13);
-
-    --code-bg:    #141c25;
-    --shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 10px 30px -18px rgba(0, 0, 0, 0.8);
-  }
+/* Bodoni Moda is a Didone: its hairlines thin out as the optical-size axis
+   climbs, and `font-optical-sizing: auto` drives opsz toward the rendered size —
+   so the largest headings ended up with the most fragile strokes, which dark
+   mode's irradiation then eroded further. Pinning a text-range opsz keeps the
+   sturdier cut at every display size. wght is restated because naming any axis
+   in font-variation-settings can drop the font-weight mapping in some engines. */
+.site-title,
+.intro-title,
+.post-item-title,
+.post-title,
+.post-content h2,
+.post-content h3,
+.post-content h4 {
+  font-variation-settings: "opsz" var(--display-opsz), "wght" 700;
 }
 
-:root[data-theme="dark"] {
-  --bg:         #0b0f14;
-  --surface:    #121922;
-  --ink:        #e8edf3;
-  --ink-soft:   #c6cedb;
-  --muted:      #8b96a6;
-  --rule:       #212b37;
-  --rule-soft:  #1a222c;
+/* Light — cool paper. Opt-in only, via the header toggle. */
+:root[data-theme="light"] {
+  color-scheme: light;
 
-  --hot:        #f2a758;
-  --hot-bright: #ffbc72;
-  --cold:       #63c4e4;
-  --accent-soft: rgba(242, 167, 88, 0.13);
+  --bg:         #f4f6f8;
+  --surface:    #ffffff;
+  --ink:        #12171f;
+  --ink-soft:   #2c3542;
+  --muted:      #5c6675;
+  --rule:       #dde2e9;
+  --rule-soft:  #e8ecf1;
 
-  --code-bg:    #141c25;
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 10px 30px -18px rgba(0, 0, 0, 0.8);
+  --hot:        #a3490f;
+  --hot-bright: #c25c18;
+  --cold:       #1d5c88;
+  --accent-soft: rgba(163, 73, 15, 0.09);
+
+  --code-bg:    #eef1f5;
+  --shadow: 0 1px 2px rgba(18, 23, 31, 0.06), 0 8px 24px -16px rgba(18, 23, 31, 0.28);
 }
 
 /* ==========================================================================
@@ -230,9 +232,10 @@ a:hover { color: var(--hot-bright); }
 }
 .icon-moon { fill: currentColor; stroke: none; }
 
-/* Show the icon for the theme you would switch *to*. */
-:root[data-theme="dark"] .icon-moon { display: none; }
-:root:not([data-theme="dark"]) .icon-sun { display: none; }
+/* Show the icon for the theme you would switch *to*. Keyed off the light stamp
+   so the default (unstamped) state correctly reads as dark. */
+:root[data-theme="light"] .icon-sun { display: none; }
+:root:not([data-theme="light"]) .icon-moon { display: none; }
 
 /* ==========================================================================
    Content column — everything shares the one measure, so figures and tables
@@ -466,11 +469,11 @@ code, kbd, samp, pre { font-family: var(--font-mono); font-size: 0.86em; }
 }
 
 /* Matplotlib exports sit on a white canvas — take the glare off in dark mode. */
-:root[data-theme="dark"] .post-content img {
+:root:not([data-theme="light"]) .post-content img {
   filter: brightness(0.88) contrast(1.04);
   transition: filter 0.2s ease;
 }
-:root[data-theme="dark"] .post-content img:hover { filter: none; }
+:root:not([data-theme="light"]) .post-content img:hover { filter: none; }
 
 .post-content figure { margin: 0; }
 .post-content figcaption,
@@ -492,6 +495,14 @@ code, kbd, samp, pre { font-family: var(--font-mono); font-size: 0.86em; }
   border-collapse: collapse;
   font-size: 1.07rem;
   display: block;
+  /* Without an explicit width, a block-level table stretches to fill the
+     column. A narrow table (few columns, short cells) then leaves dead space
+     to the right of its own left-aligned content, reading as flush-left
+     instead of centered. Shrink to content and center the box instead; wide
+     tables still cap at the column and scroll via overflow-x below. */
+  width: fit-content;
+  max-width: 100%;
+  margin-inline: auto;
   overflow-x: auto;
 }
 .post-content th,

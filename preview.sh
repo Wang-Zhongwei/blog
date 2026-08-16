@@ -15,8 +15,20 @@
 #     jekyll:3.9.5 jekyll-feed:0.15.1 kramdown-parser-gfm
 set -euo pipefail
 
-ENV_DIR="${JEKYLL_ENV_DIR:-$HOME/.conda/envs/jekyll}"
 PORT="${1:-4000}"
+
+# Resolve which conda env has Ruby: an explicit override, then the dedicated
+# `jekyll` env from the setup comment above, then whatever conda env is
+# currently active (CONDA_PREFIX) as a last resort.
+if [ -n "${JEKYLL_ENV_DIR:-}" ]; then
+  ENV_DIR="$JEKYLL_ENV_DIR"
+elif [ -x "$HOME/.conda/envs/jekyll/bin/ruby" ]; then
+  ENV_DIR="$HOME/.conda/envs/jekyll"
+elif [ -n "${CONDA_PREFIX:-}" ] && [ -x "$CONDA_PREFIX/bin/ruby" ]; then
+  ENV_DIR="$CONDA_PREFIX"
+else
+  ENV_DIR="$HOME/.conda/envs/jekyll"
+fi
 
 if [ ! -x "$ENV_DIR/bin/ruby" ]; then
   echo "No Ruby at $ENV_DIR -- see the setup comment at the top of this script." >&2

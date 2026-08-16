@@ -23,15 +23,17 @@
   <meta name="twitter:card" content="summary">
   {%- endif %}
 
-  <!-- Resolve the theme before first paint so there is no flash of the wrong one. -->
+  <!-- Resolve the theme before first paint so there is no flash of the wrong one.
+       Dark is the site default: only an explicit stored choice of "light" overrides
+       it, so the OS preference is deliberately not consulted. The attribute is
+       always stamped so the toggle always has a concrete value to flip. -->
   <script>
     (function () {
       try {
         var stored = localStorage.getItem('theme');
-        var theme = stored || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-        document.documentElement.setAttribute('data-theme', theme);
+        document.documentElement.setAttribute('data-theme', stored === 'light' ? 'light' : 'dark');
       } catch (e) {
-        document.documentElement.setAttribute('data-theme', 'light');
+        document.documentElement.setAttribute('data-theme', 'dark');
       }
     })();
   </script>
