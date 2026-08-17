@@ -9,8 +9,6 @@ GEM
       eventmachine (>= 0.12.9)
       http_parser.rb (~> 0)
     eventmachine (1.2.7)
-    execjs (2.10.2)
-      json (>= 2)
     ffi (1.17.4)
     ffi (1.17.4-aarch64-linux-gnu)
     ffi (1.17.4-aarch64-linux-musl)
@@ -47,14 +45,8 @@ GEM
       jekyll (>= 3.7, < 5.0)
     jekyll-watch (2.2.1)
       listen (~> 3.0)
-    json (2.21.2)
-    katex (0.11.0)
-      execjs (~> 2.8)
     kramdown (2.5.2)
       rexml (>= 3.4.4)
-    kramdown-math-katex (1.0.1)
-      katex (~> 0.4)
-      kramdown (~> 2.0)
     kramdown-parser-gfm (1.1.0)
       kramdown (~> 2.0)
     liquid (4.0.4)
@@ -94,12 +86,9 @@ PLATFORMS
   x86_64-linux-musl
 
 DEPENDENCIES
-  execjs (~> 2.10)
   jekyll (~> 3.9.5)
   jekyll-feed (~> 0.15)
   jekyll-sitemap (~> 1.4)
-  katex (~> 0.11.0)
-  kramdown-math-katex (~> 1.0)
   kramdown-parser-gfm (~> 1.1)
   webrick (~> 1.8)
 
