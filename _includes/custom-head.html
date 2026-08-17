@@ -1,64 +1,13 @@
-<!-- MathJax v3 ---------------------------------------------------------------
-     kramdown's mathjax engine emits display math as \[ ... \] and leaves
-     single-dollar inline math as literal text, so both delimiter styles are
-     registered below. Loaded async per MathJax v3 guidance; the config object
-     must be assigned before the library script runs.
+<!-- KaTeX -----------------------------------------------------------------------
+     Math is pre-rendered to HTML + MathML at build time by scripts/render-math.js,
+     so no JavaScript runs for math and there is no flash of raw TeX to hide.
+     Only the stylesheet is needed, to lay the pre-rendered spans out.
+
+     CSS and fonts are vendored from the same KaTeX version that renders the
+     markup (see package.json), so the stylesheet cannot drift out of sync with
+     the HTML the way a separately-pinned CDN link can -- and there is no
+     third-party request on the critical path. woff2 only: every browser that
+     can render this markup supports woff2, and shipping woff/ttf as well would
+     triple the font payload.
 -->
-<script>
-  window.MathJax = {
-    tex: {
-      inlineMath: [['$', '$'], ['\\(', '\\)']],
-      displayMath: [['$$', '$$'], ['\\[', '\\]']],
-      processEscapes: true,
-      processEnvironments: true,
-      tags: 'ams'
-    },
-    options: {
-      skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'],
-      ignoreHtmlClass: 'no-mathjax'
-    },
-    chtml: {
-      scale: 1.14,
-      displayAlign: 'center'
-    },
-    startup: {
-      // Reveal math only once it is typeset, so readers never see raw TeX.
-      pageReady: function () {
-        return MathJax.startup.defaultPageReady().then(function () {
-          document.documentElement.classList.add('mathjax-ready');
-
-          // MathJax and late-loading images change the page height after the
-          // browser's initial hash navigation. Re-align only after both settle.
-          if (window.location.hash) {
-            var alignHashTarget = function () {
-              requestAnimationFrame(function () {
-                var id;
-                try {
-                  id = decodeURIComponent(window.location.hash.slice(1));
-                } catch (e) {
-                  id = window.location.hash.slice(1);
-                }
-                var target = document.getElementById(id);
-                if (target) target.scrollIntoView();
-              });
-            };
-
-            if (document.readyState === 'complete') {
-              alignHashTarget();
-            } else {
-              window.addEventListener('load', alignHashTarget, { once: true });
-            }
-          }
-        });
-      }
-    }
-  };
-</script>
-<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
-
-<!-- Fail-safe: if the CDN is blocked or slow, stop hiding math after 3s. -->
-<script>
-  setTimeout(function () {
-    document.documentElement.classList.add('mathjax-ready');
-  }, 3000);
-</script>
+<link rel="stylesheet" href="{{ '/assets/katex/katex.css' | relative_url }}">

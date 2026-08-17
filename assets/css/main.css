@@ -572,29 +572,41 @@ code, kbd, samp, pre { font-family: var(--font-mono); font-size: 0.86em; }
   border-bottom: 1px solid var(--muted);
   white-space: nowrap;
 }
-.post-content th mjx-container {
+.post-content th .katex {
   letter-spacing: normal;
   text-transform: none;
 }
 /* Unwrappable math cells take their full width and crush prose columns into
    sliver-thin, very tall ones; floor the text cells and let the table scroll. */
-.post-content td:not(:has(mjx-container)) { min-width: 12rem; }
+.post-content td:not(:has(.katex)) { min-width: 12rem; }
 .post-content tbody tr:hover { background: var(--accent-soft); }
 
 /* Math -------------------------------------------------------------------- */
 
-/* Raw TeX is deliberately left visible while MathJax loads — a failed or
-   blocked CDN then degrades to readable source rather than a blank column. */
-mjx-container[display="true"] {
+/* Math is pre-rendered to HTML + MathML at build time, so there is no loading
+   state to style around and no raw TeX ever reaches the reader. */
+.katex-display {
   overflow-x: auto;
   overflow-y: hidden;
   padding-block: 0.35rem;
   max-width: 100%;
-  /* \tag'd equations carry an inline min-width for the number, which outranks
-     max-width and would stretch the box instead of letting it scroll. */
-  min-width: 0 !important;
 }
-mjx-container { color: var(--ink); }
+/* KaTeX lays \tag'd equations out as a 100%-wide table, which forces the box
+   to the column width instead of letting a long equation scroll inside it. */
+.katex-display > .katex { max-width: 100%; }
+.katex { color: var(--ink); }
+
+/* The MathML twin is what parsers and screen readers consume; it must stay in
+   the DOM but must never paint on top of the visual HTML rendering. */
+.katex-mathml {
+  position: absolute;
+  clip: rect(1px, 1px, 1px, 1px);
+  padding: 0;
+  border: 0;
+  height: 1px;
+  width: 1px;
+  overflow: hidden;
+}
 
 /* Footnotes & post footer -------------------------------------------------- */
 

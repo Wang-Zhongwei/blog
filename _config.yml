@@ -26,6 +26,10 @@ goatcounter_code: "nearcriticality"
 
 markdown: kramdown
 kramdown:
+  # Left as `mathjax` deliberately: kramdown emits math as literal \[ ... \] and
+  # \( ... \) delimiters, which scripts/render-math.js then pre-renders to real
+  # HTML + MathML with KaTeX after the Jekyll build. Keeping the Ruby side stock
+  # means this config still builds identically under Pages' own builder.
   math_engine: mathjax
   syntax_highlighter: rouge
 

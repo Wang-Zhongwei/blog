@@ -1,0 +1,70 @@
+# Build and deploy the site to GitHub Pages.
+#
+# This replaces Pages' built-in Jekyll build. The reason is the math step: the
+# built-in builder only runs whitelisted plugins and cannot run Node, so math
+# would stay as raw \[ ... \] in the served HTML for MathJax to typeset in the
+# browser -- invisible to search engines, reader modes and content importers.
+#
+# The Ruby side is still stock (nothing outside the Pages whitelist), so the
+# only thing this adds over the default build is the KaTeX pre-render pass.
+name: Deploy site to Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:   # lets you re-deploy by hand without an empty commit
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never let two deploys race. `cancel-in-progress: false` so an in-flight deploy
+# finishes rather than leaving Pages half-updated.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.1"
+          bundler-cache: true      # bundle install + cache, keyed on Gemfile.lock
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build with Jekyll
+        run: bundle exec jekyll build
+        env:
+          JEKYLL_ENV: production   # jekyll-feed/sitemap emit absolute URLs
+
+      # Rewrites the raw TeX kramdown emitted into real HTML + MathML, then
+      # re-scans its own output. Exits non-zero if any equation fails to parse
+      # or any delimiter survives, so a broken formula fails the deploy instead
+      # of silently shipping as backslash soup.
+      - name: Pre-render math with KaTeX
+        run: npm run render-math
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,11 @@
+{
+  "name": "near-criticality-blog",
+  "private": true,
+  "description": "Build tooling for the blog. KaTeX pre-renders math into the built HTML so equations ship as real markup instead of raw TeX.",
+  "scripts": {
+    "render-math": "node scripts/render-math.js _site"
+  },
+  "dependencies": {
+    "katex": "0.18.4"
+  }
+}
