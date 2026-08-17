@@ -46,3 +46,14 @@ exclude:
   - Gemfile
   - Gemfile.lock
   - experiments
+  # Build inputs that must never be copied into the site. Jekyll 4 excludes
+  # vendor/node_modules by default; 3.9 does not, and under GitHub Actions both
+  # land inside the repo -- setup-ruby installs gems to vendor/bundle, and
+  # `npm ci` runs before the build. Without these, Jekyll tries to parse a gem's
+  # own post template as a post, and ~8MB of node_modules ships with the site.
+  - vendor
+  - node_modules
+  - package.json
+  - package-lock.json
+  - scripts
+  - .github
