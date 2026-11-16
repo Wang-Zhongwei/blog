@@ -24,7 +24,7 @@
   {%- assign alt_url = page.translation -%}
 {%- endif -%}
 {%- if alt_doc -%}{%- assign alt_url = alt_doc.url -%}{%- endif -%}
-{%- comment -%} A reflection has no translation, so the switcher takes the reader
+{%- comment -%} For a reflection without a translation, the switcher takes the reader
   to the other language's index of reflections rather than its home page. {%- endcomment -%}
 {%- if page.collection == 'reflections' -%}
   {%- assign switch_fallback = other_t.reflections_home -%}

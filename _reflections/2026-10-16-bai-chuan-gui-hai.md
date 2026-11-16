@@ -2,6 +2,7 @@
 title: 百川归海
 date: 2026-10-16
 image: /assets/images/reflections/bai-chuan-gui-hai.jpg
+translation: /reflections/2026/10/16/bai-chuan-gui-hai/
 ---
 
 坐在屋檐下听雨，落在树叶、铁椅，和水泥地上。有的雨滴顺着枝叶滑落，渗入泥土，汇入地下水、溪流、江河，最终奔向大海；有的停留在水泥地上，等待阳光将它重新带回天空。

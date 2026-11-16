@@ -49,7 +49,8 @@ excerpt_separator: "\n\n"
 # under /zh/reflections/, and stay out of both home pages and both feeds. Each
 # language has its own index of them -- /reflections/ and /zh/reflections/ --
 # paired as translations of each other through `translation:` front matter.
-# An English essay sets `lang: en` and its own `permalink` outside /zh/.
+# English editions set `lang: en` and a `permalink` outside /zh/. Paired essays
+# link to one another with `translation:`; each index prefers its own language.
 collections:
   zh_posts:
     output: true
@@ -72,6 +73,7 @@ plugins:
   - jekyll-sitemap
 
 exclude:
+  - drafts
   - README.md
   - linkedin-teaser.md
   - preview.sh

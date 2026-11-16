@@ -3,8 +3,7 @@ layout: default
 ---
 {%- comment -%}
   Index of 随想, one per language (reflections/index.html, zh/reflections/index.html).
-  The essays themselves are mostly Chinese, so on the English index each one is
-  marked with the same language badge the home page uses for untranslated posts.
+  Prefer each essay in the index language; show unpaired essays with a language badge.
   Drafts (`published: false`) never reach site.reflections.
 {%- endcomment -%}
 {%- assign lang = page.lang | default: site.lang | default: 'en' -%}
@@ -21,6 +20,7 @@ layout: default
   {%- if listed.size > 0 -%}
     {%- for post in listed -%}
     {%- assign post_lang = post.lang | default: 'zh' -%}
+    {%- if post_lang != lang and post.translation -%}{%- continue -%}{%- endif -%}
     {%- assign post_t = site.data.i18n[post_lang] -%}
     <article class="post-item"{% if post_lang != lang %} lang="{{ post_t.html_lang }}"{% endif %}>
       <div class="post-item-body">

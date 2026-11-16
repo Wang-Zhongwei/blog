@@ -20,7 +20,7 @@ en:
   no_posts: No posts yet.
   reflections: Reflections
   reflections_home: /reflections/
-  reflections_tagline: "Essays on life and philosophy, written in Chinese."
+  reflections_tagline: "Essays on life and philosophy."
   all_reflections: All reflections
   min_read: min read
   excerpt_chars: 165          # home-page excerpt length, in characters
