@@ -17,6 +17,14 @@ dependency versions.
 It watches the tree, so saving a file rebuilds it — just refresh the browser.
 Stop with Ctrl-C. Output goes to `.jekyll-preview/` (gitignored).
 
+Two ways it runs, picked automatically:
+
+- **conda Ruby** (the HPC box, setup below): plain `jekyll serve`. Math shows
+  as raw TeX here, because KaTeX only runs in the deploy build.
+- **Docker** (e.g. the Mac, which has no usable Ruby): builds in a `ruby:3.1`
+  container and re-runs the KaTeX pass after each rebuild, so math renders
+  like production. The Chinese edition is at `http://localhost:4000/zh/`.
+
 Over Cursor/VS Code Remote-SSH the port forwards automatically, so
 `localhost:4000` in the laptop browser hits the server on the HPC node. Over a
 plain SSH session, forward it yourself:
@@ -63,8 +71,8 @@ Push to `main` and GitHub Pages rebuilds in about a minute:
 git push origin main
 ```
 
-Pages is configured as **Settings → Pages → Deploy from a branch → main /
-(root)**. Because this is a project page (not `<user>.github.io`), `_config.yml`
+`.github/workflows/pages.yml` builds with Jekyll, pre-renders math with KaTeX
+(`scripts/render-math.js`) and deploys. Because this is a project page (not `<user>.github.io`), `_config.yml`
 sets `baseurl: "/blog"` — leave it alone unless the repo is renamed.
 
 Pages serves HTML with `Cache-Control: max-age=600`, so a hard refresh
@@ -86,19 +94,45 @@ image: /assets/figures/reward-kl-frontier.png   # optional, link previews
 ---
 ```
 
-**Math.** kramdown turns `$$...$$` into `\[...\]` and passes single-dollar
-`$x$` through untouched, so `_includes/custom-head.html` registers both
-delimiter styles with MathJax. Use `$$...$$` for display and `$...$` inline.
-Raw TeX stays visible while MathJax loads, so a blocked CDN degrades to
-readable source instead of a blank column.
+**Math.** Use `$$...$$` for both display and inline math. kramdown emits it as
+`\[...\]` / `\(...\)`, and `scripts/render-math.js` pre-renders that to HTML +
+MathML with KaTeX after the build — no math JavaScript ships to readers. The
+script fails the deploy if any equation does not parse.
 
-**Figures** live flat in `assets/figures/` (one file per figure, no per-post
-subfolders) and are referenced from the site root:
+**Figures** live in `assets/figures/<post-slug>/` — only the files a post
+actually shows, since everything there is published. Scripts that generate
+figures, and source/vector versions (PDF), go in `experiments/<post-slug>/`.
 
-```markdown
-![Free energy landscape](/blog/assets/figures/free-energy-landscape.png)
-*Italic line right after an image is styled as a caption.*
+```html
+<figure id="figure-free-energy-landscape">
+  <img src="{{ '/assets/figures/<post-slug>/free-energy-landscape.png' | relative_url }}" alt="...">
+  <figcaption>...</figcaption>
+</figure>
 ```
+
+## Languages (English / 中文)
+
+English posts live in `_posts/`; their Chinese translations live in
+`_zh_posts/` **under the same filename** and are served under `/zh/`. Pairing
+is by filename (slug), which drives the header's 中文/English switcher and the
+`hreflang` links. Translation front matter is the English post's, with
+`title`/`subtitle` translated (`lang: zh` is set by default). A post with no
+translation still appears on the other language's home page, badged.
+
+UI strings (nav, dates, reading time, tagline, author name) are in
+`_data/i18n.yml`. The Chinese edition has its own feed at `/zh/feed.xml`.
+
+A first-time visitor gets the language their browser prefers (first of en/zh
+in `navigator.languages`, else English). Choosing one with the switcher is
+remembered in `localStorage` and wins from then on. The redirect logic is the
+first `<script>` in `_layouts/default.html`; it never fires for crawlers or
+for navigation within the site.
+
+Translation conventions: keep proper names in English (Gibbs, Boltzmann,
+Lagrange, Feynman), give the English original in parentheses at a key term's
+first use — 配分函数（partition function） — keep method names and acronyms
+(PPO, KL, …) in English, one paragraph per line, and a space between hanzi and
+Latin text or inline math.
 
 ## Design
 
@@ -117,7 +151,7 @@ Light is defined on bare `:root`; dark is redefined twice — under
 `@media (prefers-color-scheme: dark)` guarded by `:root:not([data-theme="light"])`,
 and under `:root[data-theme="dark"]` — so the header toggle wins in both
 directions and the page is still correct with JavaScript disabled. The toggle
-persists to `localStorage`; first visit follows the OS setting.
+persists to `localStorage`; a first visit gets dark, the site default.
 
 Define colors only as tokens. A color declared solely inside a media or
 `[data-theme]` block won't apply when the viewer is on the default "system"

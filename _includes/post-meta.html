@@ -1,12 +1,34 @@
-{%- assign word_count = include.body | strip_html | split: " " | size -%}
-{%- assign reading_minutes = word_count | plus: 199 | divided_by: 200 -%}
+{%- comment -%}
+  Date + reading time for a post. `lang` is the language of the surrounding page
+  (sets date format and labels); reading time is estimated from the post's own
+  language: ~200 words/min for English; a Chinese translation borrows its
+  original's estimate, and a Chinese-only post falls back to ~400 chars/min.
+{%- endcomment -%}
+{%- assign t = site.data.i18n[include.lang] | default: site.data.i18n.en -%}
+{%- assign date_key = 'date_' | append: include.date_style -%}
+{%- assign item_lang = include.item.lang | default: site.lang | default: 'en' -%}
+{%- assign text = include.body | strip_html -%}
+{%- assign twin = nil -%}
+{%- comment -%} Only zh_posts are translations; a reflection whose slug happens
+  to match an English post must not borrow that post's reading time. {%- endcomment -%}
+{%- if include.item.collection == 'zh_posts' -%}{%- assign twin = site.posts | where: 'slug', include.item.slug | first -%}{%- endif -%}
+{%- if twin -%}
+  {%- comment -%} A translation reads as long as its original. Counting the
+  Chinese text itself overestimates badly: before KaTeX runs, every equation
+  is still raw TeX and would count character by character. {%- endcomment -%}
+  {%- assign reading_minutes = twin.content | strip_html | split: " " | size | plus: 199 | divided_by: 200 -%}
+{%- elsif item_lang == 'zh' -%}
+  {%- assign reading_minutes = text | strip_newlines | remove: ' ' | size | plus: 399 | divided_by: 400 -%}
+{%- else -%}
+  {%- assign reading_minutes = text | split: " " | size | plus: 199 | divided_by: 200 -%}
+{%- endif -%}
 {%- if reading_minutes < 1 -%}
   {%- assign reading_minutes = 1 -%}
 {%- endif -%}
 <div class="post-meta">
   <time datetime="{{ include.item.date | date_to_xmlschema }}">
-    {{ include.item.date | date: include.date_format }}
+    {{ include.item.date | date: t[date_key] }}
   </time>
   <span aria-hidden="true">&middot;</span>
-  <span>{{ reading_minutes }} min read</span>
+  <span>{{ reading_minutes }} {{ t.min_read }}</span>
 </div>

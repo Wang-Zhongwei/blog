@@ -172,6 +172,11 @@ a:hover { color: var(--hot-bright); }
   justify-content: space-between;
   gap: 1rem;
   min-height: 3.5rem;
+  /* When title + nav no longer fit on one row (the English nav, with
+     "Reflections", on a phone), the nav drops onto its own row under the title
+     instead of running off the right edge. Wider screens never wrap. */
+  flex-wrap: wrap;
+  row-gap: 0.3rem;
 }
 
 .site-title {
@@ -189,8 +194,39 @@ a:hover { color: var(--hot-bright); }
   align-items: center;
   gap: 1.4rem;
 }
-.site-nav a { color: var(--muted); text-decoration: none; }
+.site-nav a { color: var(--muted); text-decoration: none; white-space: nowrap; }
+/* Phones: the language switcher adds a fourth item, so tighten the header
+   rather than let the site title break onto two lines. */
+@media (max-width: 30rem) {
+  .header-inner { gap: 0.75rem; padding-block: 0.45rem; }
+  .site-title { font-size: 1.12rem; white-space: nowrap; }
+  .site-nav { gap: 0.8rem; font-size: 0.75rem; letter-spacing: 0.06em; }
+}
+/* Below ~370px nothing fits on one line; wrapping the title beats overflowing. */
+@media (max-width: 23rem) {
+  .site-title { white-space: normal; }
+}
 .site-nav a:hover { color: var(--hot); }
+
+/* Language switcher: the other language's own name ("中文" / "English"). It is
+   set in that language, so undo the uppercase/tracking of the nav register
+   for CJK, where neither means anything. */
+.lang-switch:lang(zh) { letter-spacing: 0.04em; }
+
+/* Badge on a home-page entry that is only available in the other language. */
+.lang-badge {
+  display: inline-block;
+  margin-left: 0.5em;
+  padding: 0.1em 0.5em;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  vertical-align: middle;
+  color: var(--muted);
+}
 
 /* The β sweep: cold to hot. */
 .isotherm {
@@ -668,3 +704,82 @@ code, kbd, samp, pre { font-family: var(--font-mono); font-size: 0.86em; }
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ==========================================================================
+   Chinese
+   ========================================================================== */
+
+/* None of the Latin faces carry CJK glyphs, so name serif CJK fallbacks
+   explicitly (system Songti on Apple, Noto/Source Han Serif elsewhere) rather
+   than letting each browser pick its default sans. Latin runs inside Chinese
+   text still render in the Latin faces, because fallback is per glyph. */
+:lang(zh) {
+  --font-body: "Source Serif 4", "Source Serif Pro", "Songti SC", "STSong",
+               "Noto Serif SC", "Noto Serif CJK SC", "Source Han Serif SC", serif;
+  --font-display: "Bodoni Moda", "Didot", "Songti SC", "STSong",
+                  "Noto Serif SC", "Noto Serif CJK SC", "Source Han Serif SC", serif;
+  /* CJK fonts have no italics; a synthesized oblique slants hanzi badly. Latin
+     italics (paper titles in footnotes) still use Source Serif's real italic. */
+  font-synthesis: weight;
+}
+
+/* Wide tracking and uppercase are Latin small-caps devices; on hanzi they just
+   spread the characters apart. */
+.post-meta:lang(zh),
+.site-nav:lang(zh),
+.read-more:lang(zh) { letter-spacing: 0.04em; }
+
+/* Hanzi set denser than Latin; a touch more leading keeps long paragraphs
+   readable, and `text-autospace` adds the Latin/CJK gap where supported. */
+.post-content:lang(zh) {
+  line-height: 1.85;
+  text-autospace: normal;
+}
+
+/* ==========================================================================
+   随想 — photographs
+   Unlike the plots, these are photos: no white canvas or dark-mode dimming,
+   and a tall portrait shot is capped so it never fills more than a screen.
+   ========================================================================== */
+
+/* Index thumbnails. The home page's thumbs are plots shown whole on a blended
+   white canvas; these are photographs, so crop to a fixed portrait frame and
+   drop the blending and dimming. */
+.post-item-thumb--photo {
+  width: 8.5rem;
+  align-items: flex-start;
+}
+.post-item-thumb--photo img,
+:root:not([data-theme="light"]) .post-item-thumb--photo img {
+  aspect-ratio: 4 / 5;
+  height: auto;
+  max-height: none;
+  object-fit: cover;
+  border-radius: 6px;
+  mix-blend-mode: normal;
+  filter: none;
+}
+/* Phones: a full-width portrait photo above every entry would bury the list,
+   so keep the photo beside the text and shrink it instead of stacking. */
+@media (max-width: 34rem) {
+  .post-item--photo { flex-direction: row; gap: 1rem; }
+  .post-item-thumb--photo { width: 4.75rem; }
+}
+
+/* Note under the title of a translated essay, linking to the original. */
+.translation-note {
+  margin: 1.1rem 0 0;
+  font-size: 0.95rem;
+  color: var(--muted);
+}
+.translation-note a { margin-left: 0.35em; white-space: nowrap; }
+
+.post-content figure.photo img {
+  width: auto;
+  max-height: min(78vh, 40rem);
+  background: none;
+  border: none;
+}
+/* Spelled out with the same :root prefix as the dark-mode dimming rule for
+   plots, which would otherwise outrank a plain `filter: none`. */
+:root:not([data-theme="light"]) .post-content figure.photo img { filter: none; }

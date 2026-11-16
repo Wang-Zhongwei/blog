@@ -1,0 +1,50 @@
+---
+layout: default
+---
+{%- comment -%}
+  Index of 随想, one per language (reflections/index.html, zh/reflections/index.html).
+  Prefer each essay in the index language; show unpaired essays with a language badge.
+  Drafts (`published: false`) never reach site.reflections.
+{%- endcomment -%}
+{%- assign lang = page.lang | default: site.lang | default: 'en' -%}
+{%- assign t = site.data.i18n[lang] -%}
+{%- assign listed = site.reflections | sort: 'date' | reverse -%}
+
+<section class="intro">
+  <h1 class="intro-title">{{ t.reflections }}</h1>
+  <p class="intro-tagline">{{ t.reflections_tagline }}</p>
+  <div class="title-rule" aria-hidden="true"></div>
+</section>
+
+<section class="post-list">
+  {%- if listed.size > 0 -%}
+    {%- for post in listed -%}
+    {%- assign post_lang = post.lang | default: 'zh' -%}
+    {%- if post_lang != lang and post.translation -%}{%- continue -%}{%- endif -%}
+    {%- assign post_t = site.data.i18n[post_lang] -%}
+    <article class="post-item{% if post.image %} post-item--with-thumb post-item--photo{% endif %}"{% if post_lang != lang %} lang="{{ post_t.html_lang }}"{% endif %}>
+      {%- if post.image %}
+      <a class="post-item-thumb post-item-thumb--photo" href="{{ post.url | relative_url }}" tabindex="-1" aria-hidden="true">
+        <img src="{{ post.image | relative_url }}" alt="" loading="lazy" width="1200" height="1600">
+      </a>
+      {%- endif %}
+      <div class="post-item-body">
+        <div lang="{{ t.html_lang }}">{% include post-meta.html item=post body=post.content lang=lang date_style="short" %}</div>
+        <h2 class="post-item-title">
+          <a href="{{ post.url | relative_url }}">{{ post.title | escape }}</a>
+          {%- if post_lang != lang %}
+          <span class="lang-badge">{{ post_t.name }}</span>
+          {%- endif %}
+        </h2>
+        {%- assign clean = post.excerpt | strip_html | normalize_whitespace | strip -%}
+        {%- if clean != '' %}
+        <p class="post-item-excerpt">{{ clean | truncate: post_t.excerpt_chars }}</p>
+        {%- endif %}
+        <a class="read-more" href="{{ post.url | relative_url }}"><span lang="{{ t.html_lang }}">{{ t.read }}</span><span aria-hidden="true"> &rarr;</span></a>
+      </div>
+    </article>
+    {%- endfor -%}
+  {%- else -%}
+    <p class="empty">{{ t.no_posts }}</p>
+  {%- endif -%}
+</section>

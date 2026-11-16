@@ -4,3 +4,8 @@ _site/
 .jekyll-preview/
 .playwright-mcp/
 node_modules/
+__pycache__/
+*.pyc
+# Local-only: tool logs, and git worktrees made by Claude Code sessions.
+logs/
+.claude/worktrees/

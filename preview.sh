@@ -31,8 +31,44 @@ else
 fi
 
 if [ ! -x "$ENV_DIR/bin/ruby" ]; then
-  echo "No Ruby at $ENV_DIR -- see the setup comment at the top of this script." >&2
-  exit 1
+  # No conda Ruby (e.g. on a Mac): build inside Docker instead, with the same
+  # Ruby 3.1 the deploy workflow uses. Unlike `jekyll serve`, this also runs the
+  # KaTeX pass, so math looks the way it will on the live site. Jekyll watches
+  # and rebuilds; the loop below re-renders math after each rebuild.
+  if ! command -v docker >/dev/null 2>&1; then
+    echo "No Ruby at $ENV_DIR and no docker -- see the setup comment at the top of this script." >&2
+    exit 1
+  fi
+  cd "$(dirname "$0")"
+  [ -d node_modules/katex ] || npm ci
+  DEST=.jekyll-preview/site
+  rm -rf "$DEST"
+  docker rm -f blog-preview-build >/dev/null 2>&1 || true   # left over from a killed run
+  docker run --rm -d --name blog-preview-build \
+    -v "$PWD":/srv -v blog-gems:/usr/local/bundle -w /srv ruby:3.1 \
+    bash -c "bundle install --quiet && bundle exec jekyll build --watch --force_polling --baseurl '' -d /srv/$DEST" >/dev/null
+  cleanup() {
+    trap - EXIT INT TERM          # run once; `kill` below must not re-enter it
+    docker rm -f blog-preview-build >/dev/null 2>&1
+    rm -f "${STAMP:-}"
+    kill $(jobs -p) 2>/dev/null
+  }
+  trap cleanup EXIT INT TERM
+  echo "Building..."
+  until [ -f "$DEST/index.html" ]; do sleep 1; done
+  sleep 1
+  node scripts/render-math.js "$DEST" | tail -1
+  # The stamp must live outside the source tree: Jekyll watches everything
+  # there (dotfiles included), so touching it would trigger endless rebuilds.
+  STAMP="$(mktemp)"
+  ( while sleep 2; do
+      if [ -n "$(find "$DEST" -name '*.html' -newer "$STAMP" 2>/dev/null | head -1)" ]; then
+        sleep 1; node scripts/render-math.js "$DEST" | tail -1; touch "$STAMP"
+      fi
+    done ) &
+  echo "Preview: http://localhost:$PORT/   (中文: http://localhost:$PORT/zh/)  -- Ctrl-C to stop"
+  python3 -m http.server "$PORT" --bind 127.0.0.1 --directory "$DEST"
+  exit 0
 fi
 
 export PATH="$ENV_DIR/bin:$PATH"
