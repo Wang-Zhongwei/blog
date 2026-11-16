@@ -43,15 +43,27 @@ excerpt_separator: "\n\n"
 # UI strings live in _data/i18n.yml. Which language a first-time visitor sees is
 # decided in the browser from navigator.languages (see _layouts/default.html).
 # jekyll-feed only covers _posts (English); the Chinese feed is zh/feed.xml.
+#
+# Reflections (随想) are essays on life and philosophy, written in Chinese and
+# kept apart from the technical posts: they live in _reflections/, are served
+# under /zh/reflections/, and stay out of both home pages and both feeds. Each
+# language has its own index of them -- /reflections/ and /zh/reflections/ --
+# paired as translations of each other through `translation:` front matter.
+# An English essay sets `lang: en` and its own `permalink` outside /zh/.
 collections:
   zh_posts:
     output: true
     permalink: /zh/:year/:month/:day/:title:output_ext
+  reflections:
+    output: true
+    permalink: /zh/reflections/:year/:month/:day/:title/
 
 defaults:
   - scope: { path: "", type: posts }
     values: { lang: en }
   - scope: { path: "", type: zh_posts }
+    values: { lang: zh, layout: post }
+  - scope: { path: "", type: reflections }
     values: { lang: zh, layout: post }
 
 

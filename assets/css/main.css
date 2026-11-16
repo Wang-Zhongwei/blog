@@ -172,6 +172,11 @@ a:hover { color: var(--hot-bright); }
   justify-content: space-between;
   gap: 1rem;
   min-height: 3.5rem;
+  /* When title + nav no longer fit on one row (the English nav, with
+     "Reflections", on a phone), the nav drops onto its own row under the title
+     instead of running off the right edge. Wider screens never wrap. */
+  flex-wrap: wrap;
+  row-gap: 0.3rem;
 }
 
 .site-title {
@@ -193,7 +198,7 @@ a:hover { color: var(--hot-bright); }
 /* Phones: the language switcher adds a fourth item, so tighten the header
    rather than let the site title break onto two lines. */
 @media (max-width: 30rem) {
-  .header-inner { gap: 0.75rem; }
+  .header-inner { gap: 0.75rem; padding-block: 0.45rem; }
   .site-title { font-size: 1.12rem; white-space: nowrap; }
   .site-nav { gap: 0.8rem; font-size: 0.75rem; letter-spacing: 0.06em; }
 }
@@ -730,3 +735,19 @@ code, kbd, samp, pre { font-family: var(--font-mono); font-size: 0.86em; }
   line-height: 1.85;
   text-autospace: normal;
 }
+
+/* ==========================================================================
+   随想 — photographs
+   Unlike the plots, these are photos: no white canvas or dark-mode dimming,
+   and a tall portrait shot is capped so it never fills more than a screen.
+   ========================================================================== */
+
+.post-content figure.photo img {
+  width: auto;
+  max-height: min(78vh, 40rem);
+  background: none;
+  border: none;
+}
+/* Spelled out with the same :root prefix as the dark-mode dimming rule for
+   plots, which would otherwise outrank a plain `filter: none`. */
+:root:not([data-theme="light"]) .post-content figure.photo img { filter: none; }

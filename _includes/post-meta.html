@@ -9,7 +9,9 @@
 {%- assign item_lang = include.item.lang | default: site.lang | default: 'en' -%}
 {%- assign text = include.body | strip_html -%}
 {%- assign twin = nil -%}
-{%- if item_lang == 'zh' -%}{%- assign twin = site.posts | where: 'slug', include.item.slug | first -%}{%- endif -%}
+{%- comment -%} Only zh_posts are translations; a reflection whose slug happens
+  to match an English post must not borrow that post's reading time. {%- endcomment -%}
+{%- if include.item.collection == 'zh_posts' -%}{%- assign twin = site.posts | where: 'slug', include.item.slug | first -%}{%- endif -%}
 {%- if twin -%}
   {%- comment -%} A translation reads as long as its original. Counting the
   Chinese text itself overestimates badly: before KaTeX runs, every equation

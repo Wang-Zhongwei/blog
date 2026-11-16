@@ -18,9 +18,20 @@
   {%- assign alt_doc = site.posts | where: 'slug', page.slug | first -%}
 {%- elsif page.layout == 'home' -%}
   {%- assign alt_url = other_t.home -%}
+{%- elsif page.translation -%}
+  {%- comment -%} Any other page can name its translation explicitly, e.g. the
+  two indexes of 随想 (reflections/index.html, zh/reflections/index.html). {%- endcomment -%}
+  {%- assign alt_url = page.translation -%}
 {%- endif -%}
 {%- if alt_doc -%}{%- assign alt_url = alt_doc.url -%}{%- endif -%}
-{%- assign switch_url = alt_url | default: other_t.home -%}
+{%- comment -%} A reflection has no translation, so the switcher takes the reader
+  to the other language's index of reflections rather than its home page. {%- endcomment -%}
+{%- if page.collection == 'reflections' -%}
+  {%- assign switch_fallback = other_t.reflections_home -%}
+{%- else -%}
+  {%- assign switch_fallback = other_t.home -%}
+{%- endif -%}
+{%- assign switch_url = alt_url | default: switch_fallback -%}
 <!DOCTYPE html>
 <html lang="{{ t.html_lang }}">
 <head>
@@ -180,6 +191,7 @@
 
       <nav class="site-nav" aria-label="Primary">
         <a href="{{ t.home | relative_url }}">{{ t.posts }}</a>
+        <a href="{{ t.reflections_home | relative_url }}">{{ t.reflections }}</a>
         <a href="{{ t.feed | relative_url }}">{{ t.rss }}</a>
         <a class="lang-switch" href="{{ switch_url | relative_url }}"
            hreflang="{{ other_t.html_lang }}" lang="{{ other_t.html_lang }}"

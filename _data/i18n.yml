@@ -18,6 +18,10 @@ en:
   read: Read
   all_posts: All posts
   no_posts: No posts yet.
+  reflections: Reflections
+  reflections_home: /reflections/
+  reflections_tagline: "Essays on life and philosophy, written in Chinese."
+  all_reflections: All reflections
   min_read: min read
   excerpt_chars: 165          # home-page excerpt length, in characters
   date_short: "%b %-d, %Y"
@@ -40,6 +44,10 @@ zh:
   read: 阅读
   all_posts: 全部文章
   no_posts: 暂无文章。
+  reflections: 随想
+  reflections_home: /zh/reflections/
+  reflections_tagline: 关于人生与哲学的一些思考
+  all_reflections: 全部随想
   min_read: 分钟阅读
   excerpt_chars: 95           # a hanzi carries ~1.7x a Latin character's text
   date_short: "%Y年%-m月%-d日"

@@ -24,6 +24,10 @@ layout: default
   </div>
 
   <footer class="post-footer">
+    {%- if page.collection == 'reflections' %}
+    <a class="read-more" href="{{ t.reflections_home | relative_url }}"><span aria-hidden="true">&larr; </span>{{ t.all_reflections }}</a>
+    {%- else %}
     <a class="read-more" href="{{ t.home | relative_url }}"><span aria-hidden="true">&larr; </span>{{ t.all_posts }}</a>
+    {%- endif %}
   </footer>
 </article>
