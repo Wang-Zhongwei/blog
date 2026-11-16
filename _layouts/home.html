@@ -1,11 +1,31 @@
 ---
 layout: default
 ---
+{%- assign lang = page.lang | default: site.lang | default: 'en' -%}
+{%- assign t = site.data.i18n[lang] -%}
+{%- comment -%}
+  List this language's posts, plus any post that exists only in the other
+  language (badged), so nothing disappears from a reader's home page just
+  because it has not been translated yet. Pairs are matched by slug.
+{%- endcomment -%}
+{%- if lang == 'zh' -%}
+  {%- assign own = site.zh_posts -%}
+  {%- assign others = site.posts -%}
+{%- else -%}
+  {%- assign own = site.posts -%}
+  {%- assign others = site.zh_posts -%}
+{%- endif -%}
+{%- assign untranslated = '' | split: '' -%}
+{%- for p in others -%}
+  {%- assign twin = own | where: 'slug', p.slug | first -%}
+  {%- unless twin -%}{%- assign untranslated = untranslated | push: p -%}{%- endunless -%}
+{%- endfor -%}
+{%- assign listed = own | concat: untranslated | sort: 'date' | reverse -%}
 
 <section class="intro">
   <h1 class="intro-title">{{ site.title }}</h1>
-  {%- if site.description and site.description != '' %}
-  <p class="intro-tagline">{{ site.description }}</p>
+  {%- if t.description and t.description != '' %}
+  <p class="intro-tagline">{{ t.description }}</p>
   {%- endif %}
   <div class="title-rule" aria-hidden="true"></div>
 </section>
@@ -15,18 +35,22 @@ layout: default
 {%- endif %}
 
 <section class="post-list">
-  {%- if site.posts.size > 0 -%}
-    {%- for post in site.posts -%}
-    <article class="post-item{% if post.image %} post-item--with-thumb{% endif %}">
+  {%- if listed.size > 0 -%}
+    {%- for post in listed -%}
+    {%- assign post_lang = post.lang | default: site.lang | default: 'en' -%}
+    <article class="post-item{% if post.image %} post-item--with-thumb{% endif %}"{% if post_lang != lang %} lang="{{ site.data.i18n[post_lang].html_lang }}"{% endif %}>
       {%- if post.image %}
       <a class="post-item-thumb" href="{{ post.url | relative_url }}" tabindex="-1" aria-hidden="true">
         <img src="{{ post.image | relative_url }}" alt="" loading="lazy">
       </a>
       {%- endif %}
       <div class="post-item-body">
-        {% include post-meta.html item=post body=post.content date_format="%b %-d, %Y" %}
+        {% include post-meta.html item=post body=post.content lang=lang date_style="short" %}
         <h2 class="post-item-title">
           <a href="{{ post.url | relative_url }}">{{ post.title | escape }}</a>
+          {%- if post_lang != lang %}
+          <span class="lang-badge">{{ site.data.i18n[post_lang].name }}</span>
+          {%- endif %}
         </h2>
         {%- if post.subtitle %}
         <p class="post-item-subtitle">{{ post.subtitle | escape }}</p>
@@ -37,7 +61,13 @@ layout: default
           preceding word — "PPO[^ppo]" comes out as "PPO1". Liquid has no regex, so
           split each <sup>...</sup> span out whole before stripping the remainder.
         {%- endcomment -%}
-        {%- assign chunks = post.excerpt | split: '<sup' -%}
+        {%- comment -%}
+          Jekyll appends the definitions of footnotes cited in the first
+          paragraph to the excerpt; drop that block before anything else, or a
+          short (e.g. Chinese) paragraph runs straight into a citation.
+        {%- endcomment -%}
+        {%- assign excerpt_body = post.excerpt | split: '<div class="footnotes"' | first -%}
+        {%- assign chunks = excerpt_body | split: '<sup' -%}
         {%- assign excerpt_html = chunks | first -%}
         {%- for chunk in chunks offset: 1 -%}
           {%- assign after = chunk | split: '</sup>' -%}
@@ -47,13 +77,13 @@ layout: default
         {%- endfor -%}
         {%- assign clean = excerpt_html | strip_html | normalize_whitespace | strip -%}
         {%- if clean != '' %}
-        <p class="post-item-excerpt">{{ clean | truncate: 165 }}</p>
+        <p class="post-item-excerpt">{{ clean | truncate: t.excerpt_chars }}</p>
         {%- endif %}
-        <a class="read-more" href="{{ post.url | relative_url }}">Read<span aria-hidden="true"> &rarr;</span></a>
+        <a class="read-more" href="{{ post.url | relative_url }}"><span lang="{{ t.html_lang }}">{{ t.read }}</span><span aria-hidden="true"> &rarr;</span></a>
       </div>
     </article>
     {%- endfor -%}
   {%- else -%}
-    <p class="empty">No posts yet.</p>
+    <p class="empty">{{ t.no_posts }}</p>
   {%- endif -%}
 </section>

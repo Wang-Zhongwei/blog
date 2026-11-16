@@ -1,0 +1,47 @@
+# UI strings for each language the site is published in. Keys are the values a
+# page's `lang` takes (front-matter defaults in _config.yml set it per
+# collection). Layouts read `site.data.i18n[lang]`, so adding a language means
+# adding a block here, a posts collection and a home page for it.
+en:
+  html_lang: en
+  og_locale: en_US
+  name: English               # how this language names itself in the switcher
+  author: Zhongwei Wang
+  home: /
+  feed: /feed.xml
+  description: "Notes by Zhongwei Wang on RL, AI, physics and complex systems"
+  skip: Skip to content
+  posts: Posts
+  rss: RSS
+  theme_label: Switch between light and dark theme
+  lang_label: Read this page in English
+  read: Read
+  all_posts: All posts
+  no_posts: No posts yet.
+  min_read: min read
+  excerpt_chars: 165          # home-page excerpt length, in characters
+  date_short: "%b %-d, %Y"
+  date_long: "%B %-d, %Y"
+  footer_built: Built with Jekyll · typeset by KaTeX
+
+zh:
+  html_lang: zh-CN
+  og_locale: zh_CN
+  name: 中文
+  author: 王众伟
+  home: /zh/
+  feed: /zh/feed.xml
+  description: "王众伟关于强化学习、人工智能、物理与复杂系统的笔记"
+  skip: 跳到正文
+  posts: 文章
+  rss: RSS
+  theme_label: 切换浅色/深色主题
+  lang_label: 阅读本页中文版
+  read: 阅读
+  all_posts: 全部文章
+  no_posts: 暂无文章。
+  min_read: 分钟阅读
+  excerpt_chars: 95           # a hanzi carries ~1.7x a Latin character's text
+  date_short: "%Y年%-m月%-d日"
+  date_long: "%Y年%-m月%-d日"
+  footer_built: 由 Jekyll 构建 · KaTeX 排版

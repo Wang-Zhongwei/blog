@@ -189,8 +189,39 @@ a:hover { color: var(--hot-bright); }
   align-items: center;
   gap: 1.4rem;
 }
-.site-nav a { color: var(--muted); text-decoration: none; }
+.site-nav a { color: var(--muted); text-decoration: none; white-space: nowrap; }
+/* Phones: the language switcher adds a fourth item, so tighten the header
+   rather than let the site title break onto two lines. */
+@media (max-width: 30rem) {
+  .header-inner { gap: 0.75rem; }
+  .site-title { font-size: 1.12rem; white-space: nowrap; }
+  .site-nav { gap: 0.8rem; font-size: 0.75rem; letter-spacing: 0.06em; }
+}
+/* Below ~370px nothing fits on one line; wrapping the title beats overflowing. */
+@media (max-width: 23rem) {
+  .site-title { white-space: normal; }
+}
 .site-nav a:hover { color: var(--hot); }
+
+/* Language switcher: the other language's own name ("中文" / "English"). It is
+   set in that language, so undo the uppercase/tracking of the nav register
+   for CJK, where neither means anything. */
+.lang-switch:lang(zh) { letter-spacing: 0.04em; }
+
+/* Badge on a home-page entry that is only available in the other language. */
+.lang-badge {
+  display: inline-block;
+  margin-left: 0.5em;
+  padding: 0.1em 0.5em;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  vertical-align: middle;
+  color: var(--muted);
+}
 
 /* The β sweep: cold to hot. */
 .isotherm {
@@ -667,4 +698,35 @@ code, kbd, samp, pre { font-family: var(--font-mono); font-size: 0.86em; }
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* ==========================================================================
+   Chinese
+   ========================================================================== */
+
+/* None of the Latin faces carry CJK glyphs, so name serif CJK fallbacks
+   explicitly (system Songti on Apple, Noto/Source Han Serif elsewhere) rather
+   than letting each browser pick its default sans. Latin runs inside Chinese
+   text still render in the Latin faces, because fallback is per glyph. */
+:lang(zh) {
+  --font-body: "Source Serif 4", "Source Serif Pro", "Songti SC", "STSong",
+               "Noto Serif SC", "Noto Serif CJK SC", "Source Han Serif SC", serif;
+  --font-display: "Bodoni Moda", "Didot", "Songti SC", "STSong",
+                  "Noto Serif SC", "Noto Serif CJK SC", "Source Han Serif SC", serif;
+  /* CJK fonts have no italics; a synthesized oblique slants hanzi badly. Latin
+     italics (paper titles in footnotes) still use Source Serif's real italic. */
+  font-synthesis: weight;
+}
+
+/* Wide tracking and uppercase are Latin small-caps devices; on hanzi they just
+   spread the characters apart. */
+.post-meta:lang(zh),
+.site-nav:lang(zh),
+.read-more:lang(zh) { letter-spacing: 0.04em; }
+
+/* Hanzi set denser than Latin; a touch more leading keeps long paragraphs
+   readable, and `text-autospace` adds the Latin/CJK gap where supported. */
+.post-content:lang(zh) {
+  line-height: 1.85;
+  text-autospace: normal;
 }

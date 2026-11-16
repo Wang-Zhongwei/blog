@@ -1,7 +1,7 @@
 title: "Near Criticality"   # pick your own blog title
 description: "Notes by Zhongwei Wang on RL, AI, physics and complex systems"
 author: "Zhongwei Wang"
-lang: en
+lang: en   # default language; see "Languages" below
 
 # Used by the JSON-LD block in _layouts/default.html. Search engines use these
 # to tie the site to a person; drop any line you do not want emitted.
@@ -34,6 +34,26 @@ kramdown:
   syntax_highlighter: rouge
 
 excerpt_separator: "\n\n"
+
+# --- Languages -----------------------------------------------------------------
+# English posts stay in _posts at their existing URLs. Chinese posts live in the
+# zh_posts collection (_zh_posts/) and are served under /zh/. A Chinese post is
+# the translation of the English post with the SAME filename (same slug); the
+# layouts pair them up that way for the language switcher and hreflang links.
+# UI strings live in _data/i18n.yml. Which language a first-time visitor sees is
+# decided in the browser from navigator.languages (see _layouts/default.html).
+# jekyll-feed only covers _posts (English); the Chinese feed is zh/feed.xml.
+collections:
+  zh_posts:
+    output: true
+    permalink: /zh/:year/:month/:day/:title:output_ext
+
+defaults:
+  - scope: { path: "", type: posts }
+    values: { lang: en }
+  - scope: { path: "", type: zh_posts }
+    values: { lang: zh, layout: post }
+
 
 plugins:
   - jekyll-feed

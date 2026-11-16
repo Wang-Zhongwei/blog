@@ -1,11 +1,68 @@
+{%- comment -%}
+  Language context. `lang` is the language of this page (set per collection by
+  the front-matter defaults in _config.yml); `t` holds its UI strings from
+  _data/i18n.yml. `alt_url` is this page's translation, if one exists: a post
+  in the other language with the same slug, or the other language's home page.
+  When there is none, the switcher falls back to the other home page, and no
+  hreflang pair or automatic redirect is emitted.
+{%- endcomment -%}
+{%- assign lang = page.lang | default: site.lang | default: 'en' -%}
+{%- assign t = site.data.i18n[lang] -%}
+{%- if lang == 'zh' -%}{%- assign other_lang = 'en' -%}{%- else -%}{%- assign other_lang = 'zh' -%}{%- endif -%}
+{%- assign other_t = site.data.i18n[other_lang] -%}
+{%- assign alt_doc = nil -%}
+{%- assign alt_url = nil -%}
+{%- if page.collection == 'posts' -%}
+  {%- assign alt_doc = site.zh_posts | where: 'slug', page.slug | first -%}
+{%- elsif page.collection == 'zh_posts' -%}
+  {%- assign alt_doc = site.posts | where: 'slug', page.slug | first -%}
+{%- elsif page.layout == 'home' -%}
+  {%- assign alt_url = other_t.home -%}
+{%- endif -%}
+{%- if alt_doc -%}{%- assign alt_url = alt_doc.url -%}{%- endif -%}
+{%- assign switch_url = alt_url | default: other_t.home -%}
 <!DOCTYPE html>
-<html lang="{{ site.lang | default: 'en' }}">
+<html lang="{{ t.html_lang }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
+  <!-- Pick the reader's language before anything renders. An explicit choice
+       made with the language switcher (stored as "lang") wins; otherwise the
+       first of English/Chinese found in the browser's language list decides,
+       defaulting to English. Only redirects when this exact page exists in the
+       other language, and never when the reader arrived from another page of
+       this site (they are already navigating deliberately -- this also stops a
+       bounce loop when storage is blocked) or when the visitor is a crawler,
+       so search engines index both editions via the hreflang links below. -->
+  <script>
+    (function () {
+      var cur = {{ lang | jsonify }};
+      var alts = {};
+      {%- if alt_url %}
+      alts[{{ other_lang | jsonify }}] = {{ alt_url | relative_url | jsonify }};
+      {%- endif %}
+      var pref = null;
+      try { pref = localStorage.getItem('lang'); } catch (e) {}
+      if (!pref) {
+        if (navigator.webdriver || /bot|crawl|spider|slurp|preview|lighthouse/i.test(navigator.userAgent)) return;
+        try {
+          if (document.referrer && new URL(document.referrer).origin === location.origin) return;
+        } catch (e) {}
+        var langs = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || ''];
+        pref = 'en';
+        for (var i = 0; i < langs.length; i++) {
+          var l = String(langs[i]).toLowerCase();
+          if (l.indexOf('zh') === 0) { pref = 'zh'; break; }
+          if (l.indexOf('en') === 0) { pref = 'en'; break; }
+        }
+      }
+      if (pref !== cur && alts[pref]) location.replace(alts[pref] + location.search + location.hash);
+    })();
+  </script>
+
   {%- assign page_title = page.title | default: site.title -%}
-  {%- assign page_desc = page.description | default: page.subtitle | default: site.description | strip_html | normalize_whitespace | truncate: 180 -%}
+  {%- assign page_desc = page.description | default: page.subtitle | default: t.description | strip_html | normalize_whitespace | truncate: 180 -%}
 
   <title>{% if page.title %}{{ page.title }} · {{ site.title }}{% else %}{{ site.title }}{% endif %}</title>
   <meta name="description" content="{{ page_desc }}">
@@ -16,6 +73,13 @@
   <meta property="og:description" content="{{ page_desc }}">
   <meta property="og:url" content="{{ page.url | absolute_url }}">
   <meta property="og:site_name" content="{{ site.title }}">
+  <meta property="og:locale" content="{{ t.og_locale }}">
+  {%- if alt_url %}
+  <meta property="og:locale:alternate" content="{{ other_t.og_locale }}">
+  <link rel="alternate" hreflang="{{ t.html_lang }}" href="{{ page.url | absolute_url }}">
+  <link rel="alternate" hreflang="{{ other_t.html_lang }}" href="{{ alt_url | absolute_url }}">
+  <link rel="alternate" hreflang="x-default" href="{% if lang == 'en' %}{{ page.url | absolute_url }}{% else %}{{ alt_url | absolute_url }}{% endif %}">
+  {%- endif %}
   {%- if page.image %}
   <meta property="og:image" content="{{ page.image | absolute_url }}">
   <meta name="twitter:card" content="summary_large_image">
@@ -46,7 +110,11 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400..900;1,6..96,400..900&family=IBM+Plex+Mono:wght@400;500&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap">
   <link rel="stylesheet" href="{{ '/assets/css/main.css' | relative_url }}">
 
+  {%- if lang == 'en' -%}
   {%- feed_meta -%}
+  {%- else %}
+  <link type="application/atom+xml" rel="alternate" href="{{ t.feed | absolute_url }}" title="{{ site.title | escape }} ({{ t.name }})">
+  {%- endif -%}
 
   {%- comment -%}
     JSON-LD structured data. This is the one thing jekyll-seo-tag would add that
@@ -70,15 +138,15 @@
     {%- if page.tags and page.tags.size > 0 %}
     "keywords": {{ page.tags | join: ", " | jsonify }},
     {%- endif %}
-    "inLanguage": {{ site.lang | default: 'en' | jsonify }},
+    "inLanguage": {{ t.html_lang | jsonify }},
     "author": {
       "@type": "Person",
-      "name": {{ site.author | jsonify }}{% if site.author_url %},
+      "name": {{ t.author | default: site.author | jsonify }}{% if site.author_url %},
       "url": {{ site.author_url | jsonify }}{% endif %}
     },
     "publisher": {
       "@type": "Person",
-      "name": {{ site.author | jsonify }}
+      "name": {{ t.author | default: site.author | jsonify }}
     }
   }
   </script>
@@ -88,12 +156,12 @@
     "@context": "https://schema.org",
     "@type": "Blog",
     "name": {{ site.title | jsonify }},
-    "description": {{ site.description | jsonify }},
+    "description": {{ t.description | jsonify }},
     "url": {{ '/' | absolute_url | jsonify }},
-    "inLanguage": {{ site.lang | default: 'en' | jsonify }},
+    "inLanguage": {{ t.html_lang | jsonify }},
     "author": {
       "@type": "Person",
-      "name": {{ site.author | jsonify }}{% if site.author_url %},
+      "name": {{ t.author | default: site.author | jsonify }}{% if site.author_url %},
       "url": {{ site.author_url | jsonify }}{% endif %}
     }
   }
@@ -104,17 +172,20 @@
 </head>
 
 <body>
-  <a class="skip-link" href="#content">Skip to content</a>
+  <a class="skip-link" href="#content">{{ t.skip }}</a>
 
   <header class="site-header">
     <div class="shell header-inner">
-      <a class="site-title" href="{{ '/' | relative_url }}">{{ site.title }}</a>
+      <a class="site-title" href="{{ t.home | relative_url }}">{{ site.title }}</a>
 
       <nav class="site-nav" aria-label="Primary">
-        <a href="{{ '/' | relative_url }}">Posts</a>
-        <a href="{{ '/feed.xml' | relative_url }}">RSS</a>
+        <a href="{{ t.home | relative_url }}">{{ t.posts }}</a>
+        <a href="{{ t.feed | relative_url }}">{{ t.rss }}</a>
+        <a class="lang-switch" href="{{ switch_url | relative_url }}"
+           hreflang="{{ other_t.html_lang }}" lang="{{ other_t.html_lang }}"
+           data-set-lang="{{ other_lang }}" title="{{ other_t.lang_label }}">{{ other_t.name }}</a>
         <button id="theme-toggle" class="theme-toggle" type="button"
-                aria-label="Switch between light and dark theme">
+                aria-label="{{ t.theme_label }}">
           <svg class="icon-sun" viewBox="0 0 24 24" aria-hidden="true">
             <circle cx="12" cy="12" r="4.1"/>
             <line x1="12" y1="1.8" x2="12" y2="4.1"/>
@@ -142,8 +213,8 @@
 
   <footer class="site-footer">
     <div class="shell footer-inner">
-      <span>© {{ site.time | date: '%Y' }}{% if site.author and site.author != '' %} {{ site.author }}{% endif %}</span>
-      <span class="footer-meta">Built with Jekyll · typeset by KaTeX</span>
+      <span>© {{ site.time | date: '%Y' }}{% if t.author %} {{ t.author }}{% elsif site.author and site.author != '' %} {{ site.author }}{% endif %}</span>
+      <span class="footer-meta">{{ t.footer_built }}</span>
     </div>
   </footer>
 
@@ -157,6 +228,14 @@
         try { localStorage.setItem('theme', next); } catch (e) {}
       });
     })();
+
+    // Choosing a language with the switcher is an explicit preference: remember
+    // it so the browser-language default stops applying on later visits.
+    document.querySelectorAll('[data-set-lang]').forEach(function (a) {
+      a.addEventListener('click', function () {
+        try { localStorage.setItem('lang', a.getAttribute('data-set-lang')); } catch (e) {}
+      });
+    });
   </script>
 
   {% include analytics.html %}

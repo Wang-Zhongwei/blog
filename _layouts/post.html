@@ -1,10 +1,12 @@
 ---
 layout: default
 ---
+{%- assign lang = page.lang | default: site.lang | default: 'en' -%}
+{%- assign t = site.data.i18n[lang] -%}
 
 <article class="post">
   <header class="post-header">
-    {% include post-meta.html item=page body=content date_format="%B %-d, %Y" %}
+    {% include post-meta.html item=page body=content lang=lang date_style="long" %}
     <h1 class="post-title">{{ page.title | escape }}</h1>
     {%- if page.subtitle %}
     <p class="post-subtitle">{{ page.subtitle | escape }}</p>
@@ -22,6 +24,6 @@ layout: default
   </div>
 
   <footer class="post-footer">
-    <a class="read-more" href="{{ '/' | relative_url }}"><span aria-hidden="true">&larr; </span>All posts</a>
+    <a class="read-more" href="{{ t.home | relative_url }}"><span aria-hidden="true">&larr; </span>{{ t.all_posts }}</a>
   </footer>
 </article>
