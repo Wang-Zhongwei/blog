@@ -2,6 +2,7 @@
 title: It’s all about why not how
 date: 2026-09-01
 translation: /reflections/2026/09/01/why-not-how/
+image: /assets/images/reflections/why-not-how.jpg
 ---
 
 这个世界越来越不缺少信息告诉你“怎么做一件事”，真正稀缺的是有人和你说：你为什么要做这件事？因为没有人能够替代你去想清楚为什么去做。

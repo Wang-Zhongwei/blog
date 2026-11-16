@@ -742,6 +742,38 @@ code, kbd, samp, pre { font-family: var(--font-mono); font-size: 0.86em; }
    and a tall portrait shot is capped so it never fills more than a screen.
    ========================================================================== */
 
+/* Index thumbnails. The home page's thumbs are plots shown whole on a blended
+   white canvas; these are photographs, so crop to a fixed portrait frame and
+   drop the blending and dimming. */
+.post-item-thumb--photo {
+  width: 8.5rem;
+  align-items: flex-start;
+}
+.post-item-thumb--photo img,
+:root:not([data-theme="light"]) .post-item-thumb--photo img {
+  aspect-ratio: 4 / 5;
+  height: auto;
+  max-height: none;
+  object-fit: cover;
+  border-radius: 6px;
+  mix-blend-mode: normal;
+  filter: none;
+}
+/* Phones: a full-width portrait photo above every entry would bury the list,
+   so keep the photo beside the text and shrink it instead of stacking. */
+@media (max-width: 34rem) {
+  .post-item--photo { flex-direction: row; gap: 1rem; }
+  .post-item-thumb--photo { width: 4.75rem; }
+}
+
+/* Note under the title of a translated essay, linking to the original. */
+.translation-note {
+  margin: 1.1rem 0 0;
+  font-size: 0.95rem;
+  color: var(--muted);
+}
+.translation-note a { margin-left: 0.35em; white-space: nowrap; }
+
 .post-content figure.photo img {
   width: auto;
   max-height: min(78vh, 40rem);

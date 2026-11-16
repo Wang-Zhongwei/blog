@@ -4,6 +4,8 @@ date: 2026-08-07
 lang: en
 permalink: /reflections/2026/08/07/zhi-yu-qi/
 translation: /zh/reflections/2026/08/07/zhi-yu-qi/
+image: /assets/images/reflections/zhi-yu-qi.jpg
+translated_from: zh
 ---
 
 “The will commands our vital energy; that energy fills the body.”

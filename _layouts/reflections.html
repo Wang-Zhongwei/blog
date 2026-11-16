@@ -22,7 +22,12 @@ layout: default
     {%- assign post_lang = post.lang | default: 'zh' -%}
     {%- if post_lang != lang and post.translation -%}{%- continue -%}{%- endif -%}
     {%- assign post_t = site.data.i18n[post_lang] -%}
-    <article class="post-item"{% if post_lang != lang %} lang="{{ post_t.html_lang }}"{% endif %}>
+    <article class="post-item{% if post.image %} post-item--with-thumb post-item--photo{% endif %}"{% if post_lang != lang %} lang="{{ post_t.html_lang }}"{% endif %}>
+      {%- if post.image %}
+      <a class="post-item-thumb post-item-thumb--photo" href="{{ post.url | relative_url }}" tabindex="-1" aria-hidden="true">
+        <img src="{{ post.image | relative_url }}" alt="" loading="lazy" width="1200" height="1600">
+      </a>
+      {%- endif %}
       <div class="post-item-body">
         <div lang="{{ t.html_lang }}">{% include post-meta.html item=post body=post.content lang=lang date_style="short" %}</div>
         <h2 class="post-item-title">

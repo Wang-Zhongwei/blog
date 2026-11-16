@@ -2,6 +2,7 @@
 title: 我佛慈悲的大无畏精神
 date: 2026-09-09
 translation: /reflections/2026/09/09/wo-fo-ci-bei/
+image: /assets/images/reflections/wo-fo-ci-bei.jpg
 ---
 
 又看了一遍《大话西游》，这一次，我的关注点已经从至尊宝爱情的悲剧，慢慢转移到了唐僧的智慧与慈悲上。

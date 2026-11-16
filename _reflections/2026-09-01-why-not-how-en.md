@@ -4,6 +4,8 @@ date: 2026-09-01
 lang: en
 permalink: /reflections/2026/09/01/why-not-how/
 translation: /zh/reflections/2026/09/01/why-not-how/
+image: /assets/images/reflections/why-not-how.jpg
+translated_from: zh
 ---
 
 The world has more and more information telling you how to do something. What remains scarce is someone asking you why you want to do it. Because no one can think that through for you.

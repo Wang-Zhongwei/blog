@@ -12,6 +12,19 @@ layout: default
     <p class="post-subtitle">{{ page.subtitle | escape }}</p>
     {%- endif %}
     <div class="title-rule" aria-hidden="true"></div>
+    {%- comment -%}
+      A translated edition says so and links to the original. The link carries
+      data-set-lang like the header switcher: following it is an explicit choice
+      of language, and without storing it the original would bounce a reader
+      whose saved preference is this page's language straight back here.
+    {%- endcomment -%}
+    {%- if page.translated_from and page.translation %}
+    {%- assign source_t = site.data.i18n[page.translated_from] %}
+    <p class="translation-note">
+      {{ t.translated_from[page.translated_from] }}
+      <a href="{{ page.translation | relative_url }}" hreflang="{{ source_t.html_lang }}" data-set-lang="{{ page.translated_from }}">{{ t.read_original }}<span aria-hidden="true"> &rarr;</span></a>
+    </p>
+    {%- endif %}
     {%- if page.tags and page.tags.size > 0 %}
     <ul class="tag-list">
       {%- for tag in page.tags %}<li>{{ tag }}</li>{% endfor -%}

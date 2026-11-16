@@ -4,6 +4,8 @@ date: 2026-09-09
 lang: en
 permalink: /reflections/2026/09/09/wo-fo-ci-bei/
 translation: /zh/reflections/2026/09/09/wo-fo-ci-bei/
+image: /assets/images/reflections/wo-fo-ci-bei.jpg
+translated_from: zh
 ---
 
 I watched *A Chinese Odyssey* again. This time, my attention had begun to move away from the tragedy of Joker’s love story and toward the wisdom and compassion of his master, Tripitaka.

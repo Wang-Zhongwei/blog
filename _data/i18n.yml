@@ -22,6 +22,11 @@ en:
   reflections_home: /reflections/
   reflections_tagline: "Essays on life and philosophy."
   all_reflections: All reflections
+  # Note shown on a translated essay (front matter `translated_from: <lang>`),
+  # keyed by the language of the original, with a link to it.
+  translated_from:
+    zh: Translated from the Chinese.
+  read_original: Read the original
   min_read: min read
   excerpt_chars: 165          # home-page excerpt length, in characters
   date_short: "%b %-d, %Y"
@@ -48,6 +53,9 @@ zh:
   reflections_home: /zh/reflections/
   reflections_tagline: 关于人生与哲学的一些思考
   all_reflections: 全部随想
+  translated_from:
+    en: 译自英文。
+  read_original: 阅读原文
   min_read: 分钟阅读
   excerpt_chars: 95           # a hanzi carries ~1.7x a Latin character's text
   date_short: "%Y年%-m月%-d日"

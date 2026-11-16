@@ -5,6 +5,7 @@ lang: en
 permalink: /reflections/2026/10/16/bai-chuan-gui-hai/
 translation: /zh/reflections/2026/10/16/bai-chuan-gui-hai/
 image: /assets/images/reflections/bai-chuan-gui-hai.jpg
+translated_from: zh
 ---
 
 Sitting beneath the eaves, I listen to the rain falling on leaves, metal chairs, and concrete. Some drops slide down the branches and leaves, seep into the soil, and join the groundwater, streams, and rivers, eventually making their way to the sea. Others remain on the concrete, waiting for sunlight to carry them back into the sky.
